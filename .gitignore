@@ -7,3 +7,4 @@ visualize.ipynb
 rag_project_env/
 rag_project/
 chroma_data
+__pycache__
