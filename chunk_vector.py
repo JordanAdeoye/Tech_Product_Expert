@@ -162,30 +162,4 @@ if __name__ == "__main__":
 
     chunk_and_index()
 
-# from langchain_chroma import Chroma
-# from langchain_openai import OpenAIEmbeddings,ChatOpenAI
-
-# from langchain_classic.chains import RetrievalQA,create_retrieval_chain
-
-# embeddings_retrival = OpenAIEmbeddings(model="text-embedding-3-small")
-
-
-# vector_store = Chroma(
-#     client=client,                  # your chromadb client
-#     collection_name="youtube_transcripts",
-#     embedding_function=embeddings_retrival,
-#     persist_directory="./chroma_data"
-# )
-
-
-# def query_data(query):
-    
-#     llm = ChatOpenAI(model="gpt-4.1-mini",api_key=OPEN_API_KEY,temperature=0.2)
-#     retriever = vector_store.as_retriever()
-#     retrievalQA = RetrievalQA.from_llm(llm=llm, retriever=retriever,return_source_documents=True,)
-#     response = retrievalQA.invoke(query)
-#     print(response)
-
-# query = "How is the battery life on the Samsung Z Fold 7?"
-# query_data(query)
 

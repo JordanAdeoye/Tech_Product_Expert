@@ -157,7 +157,7 @@ def store_data():
 
         # initial_videos = 0
         # existing_file = {os.path.splitext(f)[0].split("_")[-1] for f in file_list} # contains video id for files stored
-        existing_file = {os.path.splitext(f)[0][-11:] for f in file_list}
+        existing_file = existing_file = {os.path.splitext(f)[0][-11:] for f in file_list}
         initial_videos = len(existing_file) # helps in containing the number of new videos added on each run
 
 
@@ -296,14 +296,6 @@ def store_data():
         with open(state_path, "w", encoding="utf-8") as f:
             json.dump(state_json, f, ensure_ascii=False, indent=2)
 
-
-        # state_json = { # once per channnel
-        #     "last_checked_at": state_now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        #     "latest_video_published_at": latest_new_published_at,
-        #     "recent_video_ids": recent_video_ids
-        # }
-        # with open(os.path.join(channel_folder, "state.json"), "w", encoding="utf-8") as f:
-        #     json.dump(state_json, f, ensure_ascii=False, indent=2)
 
 
 
