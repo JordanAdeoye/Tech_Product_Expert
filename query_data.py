@@ -42,94 +42,6 @@ from langchain_classic.prompts import PromptTemplate
 
 
 
-# # # Create the custom chain
-# # if llm is not None and vectordb is not None:
-# #     chain = ConversationalRetrievalChain.from_llm(
-# #         llm=llm, retriever=vectordb.as_retriever(), memory=memory,
-# #         get_chat_history=get_chat_history, return_source_documents=True,
-# #         combine_docs_chain_kwargs={'prompt': prompt})
-# # else:
-# #     logger.error("LLM or Vector Database not initialized")```
-
-
-
-
-
-
-
-
-
-# def query_data_rag(query,client):
-
-#     template = """
-#     You are a tech product expert (phones, laptops, tablets, smartwatches, foldables, etc.).
-#     Use ONLY the information from the following context:
-
-#     {context}
-
-#     Rules:
-#     - If the question is NOT about tech products, say: "I don't know."
-#     - If the context does not contain the answer, say: "I don't know."
-#     - Do NOT use outside knowledge.
-#     - Be concise.
-
-#     Question: {question}
-
-#     Answer:
-#     """
-
-#     prompt = PromptTemplate(
-#         template=template,
-#         input_variables=["context", "question"],
-#     )
-
-#     embeddings_retrival = OpenAIEmbeddings(model="text-embedding-3-small",api_key=OPEN_API_KEY)
-
-
-#     vector_store = Chroma(
-#         client= client,                  # your chromadb client
-#         collection_name="youtube_transcripts",
-#         embedding_function=embeddings_retrival,
-#         persist_directory="./chroma_data"
-#     )
-
-    
-#     llm = ChatOpenAI(model="gpt-4.1-mini",api_key=OPEN_API_KEY,temperature=0.7)
-#     retriever = vector_store.as_retriever(
-#         search_type="similarity_score_threshold",
-#         search_kwargs={"k": 5, "score_threshold": 0.3}
-#     )
-#     retrievalQA = RetrievalQA.from_chain_type(llm=llm, 
-#                                        retriever=retriever,
-#                                        chain_type="stuff",
-#                                         chain_type_kwargs={
-#                                             "prompt": prompt
-#                                         },
-#                                         return_source_documents=True,
-#                                         )
-#     response = retrievalQA.invoke(query)
-#     # print(response["result"])
-
-#     for word in response["result"].split():
-#         yield word + " "
-#         time.sleep(0.05)
-###################
-
-    # for i, doc in enumerate(response.get("source_documents", [])):
-    #     print(f"\nSource {i+1}:")
-    #     print(doc.metadata.get("video_title"), "|", doc.metadata.get("channel_title"))
-    #     print(doc.metadata.get("video_link"))
-
-
-# query = "How is the battery life on the Samsung Z Fold 7?"
-# # # query = "whats are the states in nigeria"
-# query_data(query,chunk_vector.client)
-
-
-
-
-
-
 
 
 from datetime import datetime
@@ -354,3 +266,94 @@ query = "what phones came out recently?"
 # query = "whats are the states in nigeria"
 # query_data(query,chunk_vector.client)
 print(query_data_rag(query,chunk_vector.client))
+
+
+
+
+
+
+
+
+
+# # # Create the custom chain
+# # if llm is not None and vectordb is not None:
+# #     chain = ConversationalRetrievalChain.from_llm(
+# #         llm=llm, retriever=vectordb.as_retriever(), memory=memory,
+# #         get_chat_history=get_chat_history, return_source_documents=True,
+# #         combine_docs_chain_kwargs={'prompt': prompt})
+# # else:
+# #     logger.error("LLM or Vector Database not initialized")```
+
+
+
+
+
+
+
+
+
+# def query_data_rag(query,client):
+
+#     template = """
+#     You are a tech product expert (phones, laptops, tablets, smartwatches, foldables, etc.).
+#     Use ONLY the information from the following context:
+
+#     {context}
+
+#     Rules:
+#     - If the question is NOT about tech products, say: "I don't know."
+#     - If the context does not contain the answer, say: "I don't know."
+#     - Do NOT use outside knowledge.
+#     - Be concise.
+
+#     Question: {question}
+
+#     Answer:
+#     """
+
+#     prompt = PromptTemplate(
+#         template=template,
+#         input_variables=["context", "question"],
+#     )
+
+#     embeddings_retrival = OpenAIEmbeddings(model="text-embedding-3-small",api_key=OPEN_API_KEY)
+
+
+#     vector_store = Chroma(
+#         client= client,                  # your chromadb client
+#         collection_name="youtube_transcripts",
+#         embedding_function=embeddings_retrival,
+#         persist_directory="./chroma_data"
+#     )
+
+    
+#     llm = ChatOpenAI(model="gpt-4.1-mini",api_key=OPEN_API_KEY,temperature=0.7)
+#     retriever = vector_store.as_retriever(
+#         search_type="similarity_score_threshold",
+#         search_kwargs={"k": 5, "score_threshold": 0.3}
+#     )
+#     retrievalQA = RetrievalQA.from_chain_type(llm=llm, 
+#                                        retriever=retriever,
+#                                        chain_type="stuff",
+#                                         chain_type_kwargs={
+#                                             "prompt": prompt
+#                                         },
+#                                         return_source_documents=True,
+#                                         )
+#     response = retrievalQA.invoke(query)
+#     # print(response["result"])
+
+#     for word in response["result"].split():
+#         yield word + " "
+#         time.sleep(0.05)
+###################
+
+    # for i, doc in enumerate(response.get("source_documents", [])):
+    #     print(f"\nSource {i+1}:")
+    #     print(doc.metadata.get("video_title"), "|", doc.metadata.get("channel_title"))
+    #     print(doc.metadata.get("video_link"))
+
+
+# query = "How is the battery life on the Samsung Z Fold 7?"
+# # # query = "whats are the states in nigeria"
+# query_data(query,chunk_vector.client)
