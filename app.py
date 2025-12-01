@@ -1,6 +1,9 @@
 import streamlit as st
-from query_data import query_data_rag
-import chunk_vector
+# from Tech_Product_Expert.rag_retrieval import query_data_rag from rag_retrieval import query_data_rag
+# import Tech_Product_Expert.rag_indexing_pipeline as rag_indexing_pipeline import rag_indexing_pipeline
+
+from rag_retrieval import query_data_rag
+import rag_indexing_pipeline
 
 st.title("Tech Expert")
 
@@ -23,7 +26,7 @@ if prompt := st.chat_input("What is up?"):
     # response = f"Echo: {prompt}"
     # Display assistant response in chat message container
     with st.chat_message("assistant"):
-        response = st.write_stream(query_data_rag(prompt,chunk_vector.client))
+        response = st.write_stream(query_data_rag(prompt,rag_indexing_pipeline.client))
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": response})
 
@@ -32,3 +35,4 @@ if prompt := st.chat_input("What is up?"):
 # query = "How is the battery life on the Samsung Z Fold 7?"
 # query = "whats are the states in nigeria"
 # return_response = query_data(query,chunk_vector.client)
+

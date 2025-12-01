@@ -29,7 +29,26 @@ from langchain_openai import OpenAIEmbeddings,ChatOpenAI
 
 from langchain_classic.chains import RetrievalQA,ConversationalRetrievalChain
 
-import chunk_vector
+import rag_indexing_pipeline
+
+
+# rag_retrieval.py
+# query_data
+
+"""
+Online RAG retrieval module.
+
+Responsibilities:
+- Connect to the Chroma vector store via LangChain.
+- Retrieve relevant YouTube transcript chunks for a user query.
+- Apply time-aware re-ranking using `published_at` metadata.
+- Format context with metadata (title, channel, published_at, link).
+- Choose between a normal prompt and a time-aware prompt depending on the query.
+- Call the LLM and return a final answer string for the UI.
+
+This module is used by the Streamlit app as the main query interface.
+"""
+
 
 load_dotenv()
 OPEN_API_KEY = os.getenv('OPEN_API_KEY')
@@ -50,6 +69,10 @@ import re
 # from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 # from langchain_chroma import Chroma
 
+
+"""
+THIS SCRIPT HANDLES THE RETRIVAL PROCESS AND USES MY TIME-AWARE RETRIVAL LOGIC WITH THE PUBLISHED_AT KEY
+"""
 OPEN_API_KEY = os.getenv('OPEN_API_KEY')
 
 
@@ -225,7 +248,7 @@ def query_data_rag(query, client):
     llm = ChatOpenAI(
         model="gpt-4.1-mini",
         api_key=OPEN_API_KEY,
-        temperature=0.2,
+        temperature=0.7,
     )
 
     # Base semantic retriever
@@ -255,15 +278,19 @@ def query_data_rag(query, client):
     #     "time_sensitive": time_sensitive,
     # }
 
-    return llm_response.content
+    for word in llm_response.content.split():
+        yield word + " "
+        time.sleep(0.05)
+
+    # return llm_response.content
     
 
 
 # query = "How is the battery life on the Samsung Z Fold 7?"
-query = "what phones came out recently?"
-# query = "whats are the states in nigeria"
-# query_data(query,chunk_vector.client)
-print(query_data_rag(query,chunk_vector.client))
+# query = "what phones came out recently?"
+# # query = "whats are the states in nigeria"
+# # query_data(query,chunk_vector.client)
+# print(query_data_rag(query,rag_indexing_pipeline.client))
 
 
 

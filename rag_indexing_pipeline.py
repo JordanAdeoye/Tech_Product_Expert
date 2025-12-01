@@ -15,6 +15,29 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+"""
+THIS SCRIPT DOES THE CLEANING AND CHUNKING AND INDEXING(STORES CHUNKS IN A VECTOR DATABASE)
+
+IT ALSO KEEPS TRACK OF INDEXED FILE SO YOU DONT INDEX FILE THAT HAVE ALREADY BEEN STORED IN A VECTORDB EACH RUN
+"""
+
+# rag_indexing_pipeline.py
+#chunk_vector.py
+"""
+Stage 2 of the RAG data pipeline.
+
+This script:
+- Loads new raw transcripts (produced by the YouTube ingestion pipeline)
+- Cleans and preprocesses transcripts
+- Splits text into semantic chunks
+- Embeds chunks using OpenAI
+- Inserts chunks into the Chroma vector database
+- Maintains indexing state to avoid reprocessing previously indexed videos
+
+This script runs AFTER youtube_fetch_pipeline.py.
+"""
+
+
 import chromadb
 client = chromadb.PersistentClient("./chroma_data")
 
@@ -95,7 +118,7 @@ def indexing(nodes,filenames):
 def chunk_and_index():
     txt_file_ext = ".txt"
     json_file_ext = ".json"
-    youtube_channels = ["@mkbhd","@unboxtherapy"]
+    youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia"]
     raw = "raw"
     raw_text = "raw/raw_text"
     data_folder = "./data"

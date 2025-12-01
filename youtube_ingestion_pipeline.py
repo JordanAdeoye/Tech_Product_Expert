@@ -4,7 +4,7 @@ from google.auth.transport.requests import Request
 from dotenv import load_dotenv
 import os
 import json
-from saving_transcript import raw_transcript
+from supadata_transcript_fetcher import raw_transcript
 import time
 # from langdetect import detect
 from datetime import datetime, timezone
@@ -21,7 +21,37 @@ DetectorFactory.seed = 0  # makes results reproducible
 #                     "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
 #                     "@ScatterVolt","@paulshardware"]
 
-youtube_channels = ["@mkbhd","@unboxtherapy"]
+
+
+""" THIS IS THE MAIN PIPELINE OPF MY RAG THIS USING THE YOUTUBE API TO TO GET INFORMATION ON YOUTUBE VIDEOS 
+CREATES A JSON(FOR DATA ON EACH VIDEO) AND TEXT(TO STORE TRASCRIPT OF EACH VIDEO)
+
+IT CONTAINS THE LOGIC ON HOW TO STORES DATA AND  AVOID DUPLICATES AND ALSO ANYTIME IT RUNS IT CHECKS FOR NEW VIDEOS
+
+IT ALSO CREATES A STATE.JSON TO INFORM ADMIN ABOUT THE NEW VIDEOS ADDED ON EACH RUN OR IF THERE WAS NO NEW VIDEO TO ADD
+
+IT ALSO INFORMS ADMIN ON THE EACH FILES THAT HAS BEEN CLEANED/PROCESSED AND ADDED TO THE VECTORDB
+
+AND IT ALSO USE "SAVING_TRANSCRIPT.PY" TO USE THE API OF SUPADAT TO DOWNKOADF TRANSCRIPTS FOR VIDEOS
+"""
+
+"""
+Stage 1 of the RAG data pipeline.
+
+This script:
+- Uses YouTube + Supadata to discover new videos
+- Stores raw transcripts and metadata locally
+- Maintains state.json to avoid duplicates and track new videos
+- Saves one JSON per video and one transcript text file
+- Writes only new videos on each run
+
+This script runs BEFORE rag_indexing_pipeline.py.
+"""
+
+
+
+youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia"]
+
 load_dotenv()
 
 video_starter_link = "https://www.youtube.com/watch?v="

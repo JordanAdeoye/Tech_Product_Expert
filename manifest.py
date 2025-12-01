@@ -2,6 +2,17 @@ import os
 import json
 import csv
 
+"""
+Utility script to export stored raw video metadata into a single CSV file.
+
+- Reads all JSON files under ./data/<channel>/raw/
+- Removes the 'description' field
+- Aggregates rows into one CSV
+- Used for analytics, debugging, or monitoring ingestion quality
+"""
+
+# metadata_exporter.py
+
 output_csv = './data/output_dict.csv'
 fieldnames = None 
 rows = []
