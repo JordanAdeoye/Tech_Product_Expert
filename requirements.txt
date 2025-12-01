@@ -1,3 +1,17 @@
 google-api-python-client
 google-auth-oauthlib
 google-auth-httplib2
+dotenv
+supadata
+langdetect
+langchain-openai
+scikit-learn
+matplotlib
+llama-index-embeddings-openai 
+tiktoken
+chromadb
+langchain-chroma
+langchain
+langchain_openai
+openai
+streamlit

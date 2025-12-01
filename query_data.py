@@ -1,0 +1,356 @@
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from dotenv import load_dotenv
+import os
+import json
+# from saving_transcript import raw_transcript
+import time
+# from langdetect import detect
+from datetime import datetime, timezone
+from langdetect import detect, DetectorFactory, LangDetectException
+from supadata import errors as supadata_errors
+
+from llama_index.core import Document
+from llama_index.core.node_parser import (
+    SentenceSplitter,
+    SemanticSplitterNodeParser,
+)
+from llama_index.embeddings.openai import OpenAIEmbedding
+import json
+import tiktoken
+import re
+import os
+from dotenv import load_dotenv
+
+import chromadb
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings,ChatOpenAI
+
+from langchain_classic.chains import RetrievalQA,ConversationalRetrievalChain
+
+import chunk_vector
+
+load_dotenv()
+OPEN_API_KEY = os.getenv('OPEN_API_KEY')
+
+
+
+
+
+from langchain_classic.prompts import PromptTemplate
+
+
+
+# # # Create the custom chain
+# # if llm is not None and vectordb is not None:
+# #     chain = ConversationalRetrievalChain.from_llm(
+# #         llm=llm, retriever=vectordb.as_retriever(), memory=memory,
+# #         get_chat_history=get_chat_history, return_source_documents=True,
+# #         combine_docs_chain_kwargs={'prompt': prompt})
+# # else:
+# #     logger.error("LLM or Vector Database not initialized")```
+
+
+
+
+
+
+
+
+
+# def query_data_rag(query,client):
+
+#     template = """
+#     You are a tech product expert (phones, laptops, tablets, smartwatches, foldables, etc.).
+#     Use ONLY the information from the following context:
+
+#     {context}
+
+#     Rules:
+#     - If the question is NOT about tech products, say: "I don't know."
+#     - If the context does not contain the answer, say: "I don't know."
+#     - Do NOT use outside knowledge.
+#     - Be concise.
+
+#     Question: {question}
+
+#     Answer:
+#     """
+
+#     prompt = PromptTemplate(
+#         template=template,
+#         input_variables=["context", "question"],
+#     )
+
+#     embeddings_retrival = OpenAIEmbeddings(model="text-embedding-3-small",api_key=OPEN_API_KEY)
+
+
+#     vector_store = Chroma(
+#         client= client,                  # your chromadb client
+#         collection_name="youtube_transcripts",
+#         embedding_function=embeddings_retrival,
+#         persist_directory="./chroma_data"
+#     )
+
+    
+#     llm = ChatOpenAI(model="gpt-4.1-mini",api_key=OPEN_API_KEY,temperature=0.7)
+#     retriever = vector_store.as_retriever(
+#         search_type="similarity_score_threshold",
+#         search_kwargs={"k": 5, "score_threshold": 0.3}
+#     )
+#     retrievalQA = RetrievalQA.from_chain_type(llm=llm, 
+#                                        retriever=retriever,
+#                                        chain_type="stuff",
+#                                         chain_type_kwargs={
+#                                             "prompt": prompt
+#                                         },
+#                                         return_source_documents=True,
+#                                         )
+#     response = retrievalQA.invoke(query)
+#     # print(response["result"])
+
+#     for word in response["result"].split():
+#         yield word + " "
+#         time.sleep(0.05)
+###################
+
+    # for i, doc in enumerate(response.get("source_documents", [])):
+    #     print(f"\nSource {i+1}:")
+    #     print(doc.metadata.get("video_title"), "|", doc.metadata.get("channel_title"))
+    #     print(doc.metadata.get("video_link"))
+
+
+# query = "How is the battery life on the Samsung Z Fold 7?"
+# # # query = "whats are the states in nigeria"
+# query_data(query,chunk_vector.client)
+
+
+
+
+
+
+
+
+from datetime import datetime
+import re
+# from langchain.prompts import PromptTemplate
+# from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+# from langchain_chroma import Chroma
+
+OPEN_API_KEY = os.getenv('OPEN_API_KEY')
+
+
+# --- Helpers --------------------------------------------------------
+
+TIME_SENSITIVE_KEYWORDS = [
+    "latest",
+    "most recent",
+    "recent",
+    "as of now",
+    "right now",
+    "currently",
+    "this year",
+    "these days",
+    "up to date",
+    "newest",
+]
+
+
+def is_time_sensitive(query: str) -> bool:
+    q = query.lower()
+
+    # keyword-based check
+    if any(kw in q for kw in TIME_SENSITIVE_KEYWORDS):
+        return True
+
+    # contains an explicit year like 2023, 2024, 2025, etc.
+    year_matches = re.findall(r"\b(20[2-9][0-9])\b", q)
+    if year_matches:
+        return True
+
+    return False
+
+
+def parse_date_safe(date_str: str):
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return None
+
+
+
+def time_aware_sort(query: str, docs):
+    """
+    If the query is time-sensitive, sort docs by published_at (newest first).
+    Otherwise, keep original order.
+    """
+    if not docs:
+        return docs
+
+    if not is_time_sensitive(query):
+        # Non-time-sensitive question: keep similarity order
+        return docs
+
+    # Time-sensitive: sort by published_at descending
+    def sort_key(doc):
+        date_str = doc.metadata.get("published_at")
+        dt = parse_date_safe(date_str)
+        # Newest first: use timestamp, fallback to very old timestamp if missing
+        return dt.timestamp() if dt else 0.0
+
+    # sorted ascending by default → reverse=True for newest first
+    docs_sorted = sorted(docs, key=sort_key, reverse=True)
+    return docs_sorted
+
+
+def format_docs_with_metadata(docs):
+    """
+    Turn Documents into a single context string with metadata headers.
+    """
+    chunks = []
+    for doc in docs:
+        meta = doc.metadata or {}
+        published_at = meta.get("published_at", "Unknown date")
+        channel = meta.get("channel_title", "Unknown channel")
+        title = meta.get("video_title", "Unknown title")
+        link = meta.get("video_link", "")
+
+        header_parts = [
+            f"Published At: {published_at}",
+            f"Channel: {channel}",
+            f"Title: {title}",
+        ]
+        if link:
+            header_parts.append(f"Link: {link}")
+
+        header = " | ".join(header_parts)
+
+        chunk_text = f"[{header}]\n{doc.page_content}"
+        chunks.append(chunk_text)
+
+    return "\n\n---\n\n".join(chunks)
+
+
+# --- Main RAG function ---------------------------------------------
+DEFAULT_TEMPLATE = """
+You are a tech product expert (phones, laptops, tablets, smartwatches, foldables, etc.).
+
+You will be given context chunks from YouTube transcripts.
+Each chunk may start with metadata such as title, channel, and published date.
+
+Context:
+{context}
+
+Rules:
+- If the question is NOT about tech products, say: "I don't know."
+- If the context does not contain the answer, say: "I don't know."
+- Do NOT use outside knowledge.
+- You may use dates in the context to choose the most relevant information,
+  but if the user does NOT ask about time, dates, or years, you generally
+  should NOT mention specific dates or years in your answer. Just answer the
+  question directly and concisely.
+- Be concise.
+
+Question: {question}
+
+Answer:
+"""
+TIME_AWARE_TEMPLATE = """
+You are a tech product expert (phones, laptops, tablets, smartwatches, foldables, etc.).
+
+You will be given context chunks from YouTube transcripts.
+Each chunk starts with metadata, including a "Published At" date (when the video was released).
+
+Context:
+{context}
+
+Rules:
+- If the question is NOT about tech products, say: "I don't know."
+- If the context does not contain the answer, say: "I don't know."
+- Do NOT use outside knowledge.
+- Use the "Published At" dates when the user asks about time, years,
+  "latest", "recent", or similar:
+  - Prefer newer chunks for "latest"/"most recent"/"current" questions.
+  - If older and newer chunks disagree, assume newer chunks are more up-to-date
+    and say this explicitly.
+  - When the question is about time (e.g., "in 2025", "over the years"),
+    mention dates or years in your answer (e.g., "In a July 2025 review...").
+- Be concise.
+
+Question: {question}
+
+Answer:
+"""
+def query_data_rag(query, client):
+
+    
+
+    time_sensitive = is_time_sensitive(query)
+
+    # 2) Pick the right template
+    template = TIME_AWARE_TEMPLATE if time_sensitive else DEFAULT_TEMPLATE
+
+    prompt = PromptTemplate(
+        template=template,
+        input_variables=["context", "question"],
+    )
+
+    embeddings_retrival = OpenAIEmbeddings(
+        model="text-embedding-3-small",
+        api_key=OPEN_API_KEY,
+    )
+
+    vector_store = Chroma(
+        client=client,                  # your chromadb client
+        collection_name="youtube_transcripts",
+        embedding_function=embeddings_retrival,
+        persist_directory="./chroma_data",
+    )
+
+    llm = ChatOpenAI(
+        model="gpt-4.1-mini",
+        api_key=OPEN_API_KEY,
+        temperature=0.2,
+    )
+
+    # Base semantic retriever
+    retriever = vector_store.as_retriever(
+        search_type="similarity_score_threshold",
+        search_kwargs={"k": 5, "score_threshold": 0.15},
+    )
+
+    # 1) Get semantically similar docs
+    docs = retriever.invoke(query)
+
+    # 2) Time-aware re-ranking using published_at metadata
+    docs = time_aware_sort(query, docs)
+
+    # # 3) Build context string with metadata injected
+    context = format_docs_with_metadata(docs)
+
+    # # 4) Run the LLM with our custom prompt
+    formatted_prompt = prompt.format(context=context, question=query)
+    llm_response = llm.invoke(formatted_prompt)
+
+    # Optional: return both answer + source docs
+    # return {
+    #     "answer": llm_response.content,
+    #     # "source_documents": docs,
+    # }
+
+    return {
+        "answer": llm_response.content,
+        "source_documents": docs,
+        "time_sensitive": time_sensitive,
+    }
+    
+
+
+# query = "How is the battery life on the Samsung Z Fold 7?"
+query = "what phones came out recently?"
+# query = "whats are the states in nigeria"
+# query_data(query,chunk_vector.client)
+print(query_data_rag(query,chunk_vector.client))

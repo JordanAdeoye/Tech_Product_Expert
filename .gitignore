@@ -3,3 +3,7 @@ client_secret_file.json
 test_import.py
 data/
 .DS_Store
+visualize.ipynb
+rag_project_env/
+rag_project/
+chroma_data
