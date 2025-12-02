@@ -254,7 +254,7 @@ def query_data_rag(query, client):
     # Base semantic retriever
     retriever = vector_store.as_retriever(
         search_type="similarity_score_threshold",
-        search_kwargs={"k": 5, "score_threshold": 0.15},
+        search_kwargs={"k": 10, "score_threshold": 0.15},
     )
 
     # 1) Get semantically similar docs

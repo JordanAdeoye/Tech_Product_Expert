@@ -21,6 +21,9 @@ DetectorFactory.seed = 0  # makes results reproducible
 #                     "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
 #                     "@ScatterVolt","@paulshardware"]
 
+youtube_channels = ["@austinevans","@CreatedbyEllaYT","@ShortCircuit",
+                    "@ScatterVolt","@paulshardware"]
+
 
 
 """ THIS IS THE MAIN PIPELINE OPF MY RAG THIS USING THE YOUTUBE API TO TO GET INFORMATION ON YOUTUBE VIDEOS 
@@ -50,7 +53,7 @@ This script runs BEFORE rag_indexing_pipeline.py.
 
 
 
-youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia"]
+# youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia"]
 
 load_dotenv()
 
@@ -131,27 +134,123 @@ def safe_detect_language(text):
 
 
 #  retries transcript(supadat api for the transcript) multiple times before moving on if it hits a 429 error(rate limit error) technique is called backoff
-def supadata_error_handler(url,videoid):
-    max_retries = 1 #5
+# def supadata_error_handler(url,videoid):
+#     max_retries = 1 #5
+#     delay = 5  # start with 5 seconds
+#     for attempt in range(max_retries):
+#         try:
+#             raw_text = raw_transcript(url)
+#             break  # success → exit loop
+#         except supadata_errors.SupadataError as e:
+#             if "limit-exceeded" in str(e).lower():
+#                 print(f"Rate limit hit. Waiting {delay}s before retrying (attempt {attempt+1})...")
+#                 time.sleep(delay)
+#                 delay *= 2  # exponential backoff
+#             else:
+#                 raise  # rethrow if it's a different Supadata error
+#     else:
+#         raw_text = None  # all retries failed
+#         print(f"Skipping video {videoid} after repeated 429s.")
+#     return raw_text#,failed_transcript
+
+# def supadata_error_handler(url, videoid):
+#     max_retries = 5  # you can set this back to 1 if you want
+#     delay = 5        # start with 5 seconds
+
+#     for attempt in range(max_retries):
+#         try:
+#             raw_text = raw_transcript(url)
+#             return raw_text  # success → exit immediately
+#         except supadata_errors.SupadataError as e:
+#             msg = str(e).lower()
+
+#             # 1) Rate limit → retry with backoff
+#             if "limit-exceeded" in msg:
+#                 print(
+#                     f"[Supadata] Rate limit hit for {videoid}. "
+#                     f"Waiting {delay}s before retrying (attempt {attempt+1}/{max_retries})..."
+#                 )
+#                 time.sleep(delay)
+#                 delay *= 2
+#                 continue  # try again
+
+#             # 2) Transcript unavailable → normal case, just skip
+#             if "transcript-unavailable" in msg:
+#                 print(
+#                     f"[Supadata] Transcript unavailable for video {videoid}. "
+#                     f"Skipping this video."
+#                 )
+#                 return None
+
+#             # 3) Any other error → log + skip
+#             print(f"[Supadata] Error for video {videoid}: {e}. Skipping this video.")
+#             return None
+
+#     # If we exhausted all retries due to rate limit and still failed:
+#     print(f"[Supadata] Skipping video {videoid} after repeated rate-limit errors.")
+#     return None
+
+
+def supadata_error_handler(url, videoid):
+    max_retries = 5
     delay = 5  # start with 5 seconds
+
     for attempt in range(max_retries):
         try:
             raw_text = raw_transcript(url)
-            break  # success → exit loop
+            return raw_text  # success → exit immediately
+
         except supadata_errors.SupadataError as e:
-            if "limit-exceeded" in str(e).lower():
-                print(f"Rate limit hit. Waiting {delay}s before retrying (attempt {attempt+1})...")
+            msg = str(e).lower()
+
+            # 1) Rate limit → retry with backoff
+            if "limit-exceeded" in msg:
+                print(
+                    f"[Supadata] Rate limit hit for {videoid}. "
+                    f"Waiting {delay}s before retrying (attempt {attempt+1}/{max_retries})..."
+                )
                 time.sleep(delay)
-                delay *= 2  # exponential backoff
-            else:
-                raise  # rethrow if it's a different Supadata error
-    else:
-        raw_text = None  # all retries failed
-        print(f"Skipping video {videoid} after repeated 429s.")
-    return raw_text#,failed_transcript
+                delay *= 2
+                continue  # try again
 
+            # 2) Transcript unavailable → normal "no transcript" case, don't crash
+            if "transcript-unavailable" in msg:
+                print(
+                    f"[Supadata] Transcript unavailable for video {videoid}. "
+                    f"Skipping this video."
+                )
+                return None
 
+            # 3) Any other Supadata error → log + skip this video
+            print(f"[Supadata] Error for video {videoid}: {e}. Skipping this video.")
+            return None
 
+        except requests.exceptions.HTTPError as e:
+            # Handle 5xx server errors from Supadata (like your 502)
+            status = e.response.status_code if e.response is not None else None
+
+            if status is not None and 500 <= status < 600:
+                # Treat as temporary → retry with backoff
+                print(
+                    f"[Supadata] HTTP {status} from API for {videoid}. "
+                    f"Waiting {delay}s before retrying (attempt {attempt+1}/{max_retries})..."
+                )
+                time.sleep(delay)
+                delay *= 2
+                continue  # try again
+
+            # 4xx or unknown: log + skip
+            print(f"[Supadata] HTTP error for video {videoid}: {e}. Skipping this video.")
+            return None
+
+        except Exception as e:
+            # Last-resort catch-all so a weird error on one video doesn't kill the run
+            print(f"[Supadata] Unexpected error for video {videoid}: {e}. Skipping this video.")
+            return None
+
+    # If we exhausted all retries due to rate limit or 5xx
+    print(f"[Supadata] Skipping video {videoid} after repeated errors.")
+    return None
 
 
 

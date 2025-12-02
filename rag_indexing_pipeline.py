@@ -70,10 +70,23 @@ def clean_transcript(text: str) -> str:
 #     buffer_size=1, breakpoint_percentile_threshold=95, embed_model=embed_model
 # )
 
-def chunk_up(text: str):
+# def chunk_up(text: str):
 
-    doc = Document(text=text)
-    nodes = splitter.get_nodes_from_documents([doc])
+#     doc = Document(text=text)
+#     nodes = splitter.get_nodes_from_documents([doc])
+#     return nodes
+
+base_splitter = SentenceSplitter(chunk_size=2000)  # you can tune size
+
+def chunk_up(text: str):
+    # 1. First chunk the big transcript
+    base_chunks = base_splitter.split_text(text)
+
+    # 2. Convert to documents so semantic splitter sees smaller pieces
+    docs = [Document(text=c) for c in base_chunks]
+
+    # 3. Now apply semantic splitter safely
+    nodes = splitter.get_nodes_from_documents(docs)
     return nodes
 
 
@@ -118,7 +131,10 @@ def indexing(nodes,filenames):
 def chunk_and_index():
     txt_file_ext = ".txt"
     json_file_ext = ".json"
-    youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia"]
+    # youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia"]
+    youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia","@Mrwhosetheboss",
+                    "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
+                    "@ScatterVolt","@paulshardware"]
     raw = "raw"
     raw_text = "raw/raw_text"
     data_folder = "./data"
@@ -147,6 +163,10 @@ def chunk_and_index():
                 if i in state["indexed_video_ids"]: # in this case if for any reason store_data() and index.py ever get out of sync, it’s nice to defensively skip already-indexed videos
                     continue
                 path_transcript = os.path.join(data_folder, channel, "raw", "raw_text", i + ".txt")
+                
+                if not os.path.exists(path_transcript):
+                    print("Transcript missing, skipping:", i) # if transcript is missing in text file folder skip it
+                    continue
 
                 with open(path_transcript,"r", encoding="utf-8") as f:
                     data = f.read()
