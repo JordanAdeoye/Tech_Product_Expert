@@ -15,3 +15,5 @@ langchain
 langchain_openai
 openai
 streamlit
+langchain-classic
+supabase

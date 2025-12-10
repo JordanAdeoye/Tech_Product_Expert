@@ -11,18 +11,24 @@ from datetime import datetime, timezone
 from langdetect import detect, DetectorFactory, LangDetectException
 from supadata import errors as supadata_errors
 
+from supabase import create_client, Client
+url: str = os.getenv("SUPABASE_URL")
+key: str = os.getenv("SUPABASE_KEY")
+
+supabase: Client = create_client(url, key)
+
 DetectorFactory.seed = 0  # makes results reproducible
 
 # UCBJycsmduvYEL83R_U4JriQ - marquees brownlee id
 # UULFBJycsmduvYEL83R_U4JriQ - playlist id
 
 # youtube channels usersnames
-# youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia","@Mrwhosetheboss",
-#                     "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
-#                     "@ScatterVolt","@paulshardware"]
-
-youtube_channels = ["@austinevans","@CreatedbyEllaYT","@ShortCircuit",
+youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia","@Mrwhosetheboss",
+                    "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
                     "@ScatterVolt","@paulshardware"]
+
+# youtube_channels = ["@austinevans","@CreatedbyEllaYT","@ShortCircuit",
+#                     "@ScatterVolt","@paulshardware"]
 
 
 
@@ -77,7 +83,8 @@ def get_youtube_channel_id(handle):
 
     # uploads = response['items'][0]["contentDetails"]["relatedPlaylists"]["uploads"] # UUBJycsmduvYEL83R_U4JriQ
     username_id = response['items'][0]['id']
-    return username_id
+    title = response['items'][0]["snippet"]['title']
+    return username_id,title
 
 
 
@@ -131,64 +138,6 @@ def safe_detect_language(text):
 
 
 
-
-
-#  retries transcript(supadat api for the transcript) multiple times before moving on if it hits a 429 error(rate limit error) technique is called backoff
-# def supadata_error_handler(url,videoid):
-#     max_retries = 1 #5
-#     delay = 5  # start with 5 seconds
-#     for attempt in range(max_retries):
-#         try:
-#             raw_text = raw_transcript(url)
-#             break  # success → exit loop
-#         except supadata_errors.SupadataError as e:
-#             if "limit-exceeded" in str(e).lower():
-#                 print(f"Rate limit hit. Waiting {delay}s before retrying (attempt {attempt+1})...")
-#                 time.sleep(delay)
-#                 delay *= 2  # exponential backoff
-#             else:
-#                 raise  # rethrow if it's a different Supadata error
-#     else:
-#         raw_text = None  # all retries failed
-#         print(f"Skipping video {videoid} after repeated 429s.")
-#     return raw_text#,failed_transcript
-
-# def supadata_error_handler(url, videoid):
-#     max_retries = 5  # you can set this back to 1 if you want
-#     delay = 5        # start with 5 seconds
-
-#     for attempt in range(max_retries):
-#         try:
-#             raw_text = raw_transcript(url)
-#             return raw_text  # success → exit immediately
-#         except supadata_errors.SupadataError as e:
-#             msg = str(e).lower()
-
-#             # 1) Rate limit → retry with backoff
-#             if "limit-exceeded" in msg:
-#                 print(
-#                     f"[Supadata] Rate limit hit for {videoid}. "
-#                     f"Waiting {delay}s before retrying (attempt {attempt+1}/{max_retries})..."
-#                 )
-#                 time.sleep(delay)
-#                 delay *= 2
-#                 continue  # try again
-
-#             # 2) Transcript unavailable → normal case, just skip
-#             if "transcript-unavailable" in msg:
-#                 print(
-#                     f"[Supadata] Transcript unavailable for video {videoid}. "
-#                     f"Skipping this video."
-#                 )
-#                 return None
-
-#             # 3) Any other error → log + skip
-#             print(f"[Supadata] Error for video {videoid}: {e}. Skipping this video.")
-#             return None
-
-#     # If we exhausted all retries due to rate limit and still failed:
-#     print(f"[Supadata] Skipping video {videoid} after repeated rate-limit errors.")
-#     return None
 
 
 def supadata_error_handler(url, videoid):
@@ -263,31 +212,22 @@ def store_data():
     run_id = datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
     for handle in youtube_channels: # per channel
 
-        channel_folder = os.path.join(folder_path, handle) # each youtube channel e.g mkhbd,ksi
-        raw_dir       = os.path.join(channel_folder, "raw")
-        raw_text_dir  = os.path.join(raw_dir, "raw_text")
+        username_id,title = get_youtube_channel_id(handle)
 
-        
-        os.makedirs(channel_folder, exist_ok=True) # folder for each channel
-        os.makedirs(raw_dir,exist_ok=True) # json files here
-        os.makedirs(raw_text_dir,exist_ok=True) # stores raw transcript here in this folder as txt
-        username_id = get_youtube_channel_id(handle)
+        # load youtube channel data into supabase database (Channel table)
+        res_channel = (
+        supabase.table("Channels")
+        .upsert([{"youtube_channel_id": username_id,"handle":handle,"channel_title":title}],
+            on_conflict="youtube_channel_id",
+            default_to_null=True)
+        .execute()
+        )
+        # get the pk for each row(youtube channle)
+        channel_uuid = res_channel.data[0]["id"]
+        # check for existing videos in the Video table filter by pk as it is fk in the videos 
+        rows = supabase.table("Videos").select("video_id").eq("channel_id", channel_uuid).execute().data
 
-        recent_video_ids = []
-        latest_new_published_at = None
-
-        file_list = [
-            f for f in os.listdir(raw_dir)
-            if os.path.isfile(os.path.join(raw_dir, f))
-                and f.endswith(".json")
-                and f != ".DS_Store"
-        ]
-
-
-        # initial_videos = 0
-        # existing_file = {os.path.splitext(f)[0].split("_")[-1] for f in file_list} # contains video id for files stored
-        existing_file = existing_file = {os.path.splitext(f)[0][-11:] for f in file_list}
-        initial_videos = len(existing_file) # helps in containing the number of new videos added on each run
+        existing_file = {row["video_id"] for row in rows}
 
 
 
@@ -325,105 +265,105 @@ def store_data():
                 
 
 
-                # save the raw transcript text to txt file in data/{channel}/raw/raw_text
-                txt_filename = f"{date_part}_{safe_channel}_{video_id}.txt" # 2025-10-30_Marques_Brownlee_rU9aqBv0YdY
-                json_filename = f"{date_part}_{safe_channel}_{video_id}.json" # 2025-10-30_Marques_Brownlee_rU9aqBv0YdY
+        #         # save the raw transcript text to txt file in data/{channel}/raw/raw_text
+        #         txt_filename = f"{date_part}_{safe_channel}_{video_id}.txt" # 2025-10-30_Marques_Brownlee_rU9aqBv0YdY
+        #         json_filename = f"{date_part}_{safe_channel}_{video_id}.json" # 2025-10-30_Marques_Brownlee_rU9aqBv0YdY
                 
 
-                now_utc = datetime.now(timezone.utc) # time transcript was fetched 
+        #         now_utc = datetime.now(timezone.utc) # time transcript was fetched 
 
                 
-                if raw_text: # if raw_text(transcript) is all good
-                    # write transcript file
-                    txt_path_abs = os.path.join(raw_text_dir, txt_filename) # txt file for the transcript to be saved
-                    with open(txt_path_abs, "w", encoding="utf-8") as fh:
-                        fh.write(raw_text)
+        #         if raw_text: # if raw_text(transcript) is all good
+        #             # write transcript file
+        #             txt_path_abs = os.path.join(raw_text_dir, txt_filename) # txt file for the transcript to be saved
+        #             with open(txt_path_abs, "w", encoding="utf-8") as fh:
+        #                 fh.write(raw_text)
 
-                    status = "fetched"
-                    transcript_source = "supadata"
-                    transcript_fetched_at = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-                    file_path_raw = os.path.join("raw", "raw_text", txt_filename)  # store RELATIVE path in JSON
+        #             status = "fetched"
+        #             transcript_source = "supadata" # dont hard code this (if i use the function then)
+        #             transcript_fetched_at = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+        #             file_path_raw = os.path.join("raw", "raw_text", txt_filename)  # store RELATIVE path in JSON
 
-                else: #if raw_text fails for any reason
-                    status = "unavailable"      # or "unavailable" if you won't retry
-                    transcript_source = "unavailable"
-                    transcript_fetched_at = None
-                    file_path_raw = None
+        #         else: #if raw_text fails for any reason
+        #             status = "unavailable"      # or "unavailable" if you won't retry
+        #             transcript_source = "unavailable"
+        #             transcript_fetched_at = None
+        #             file_path_raw = None
 
-                video_info = {
-                    "channel_title": channel_title,
-                    "channel_id": username_id,
-                    "language": safe_detect_language(raw_text) if raw_text else None,
-                    "video_title": items["snippet"]["title"],
-                    "description": items["snippet"]["description"],
-                    "published_at": published_at,
-                    "video_id": video_id,
-                    "transcript_source": transcript_source,
-                    "transcript_fetched_at": transcript_fetched_at,
-                    "status": status,
-                    "run_id": run_id,
-                    "video_link": video_starter_link + items["contentDetails"]["videoId"],
-                    "file_path_raw": file_path_raw,   # prefer this key over embedding text
-                }
-                # print("\n")
-                # print(video_info["raw_transcript"]) 
+        #         video_info = {
+        #             "channel_title": channel_title,
+        #             "channel_id": username_id,
+        #             "language": safe_detect_language(raw_text) if raw_text else None,
+        #             "video_title": items["snippet"]["title"],
+        #             "description": items["snippet"]["description"],
+        #             "published_at": published_at,
+        #             "video_id": video_id,
+        #             "transcript_source": transcript_source,
+        #             "transcript_fetched_at": transcript_fetched_at,
+        #             "status": status,
+        #             "run_id": run_id,
+        #             "video_link": video_starter_link + items["contentDetails"]["videoId"],
+        #             "file_path_raw": file_path_raw,   # prefer this key over embedding text
+        #         }
+        #         # print("\n")
+        #         # print(video_info["raw_transcript"]) 
                 
 
-                json_path_abs = os.path.join(channel_folder, "raw", json_filename) # json files for the json(video_info) to be saved
-                with open(json_path_abs, "w", encoding="utf-8") as f:
-                    json.dump(video_info, f, ensure_ascii=False, indent=2)
+        #         json_path_abs = os.path.join(channel_folder, "raw", json_filename) # json files for the json(video_info) to be saved
+        #         with open(json_path_abs, "w", encoding="utf-8") as f:
+        #             json.dump(video_info, f, ensure_ascii=False, indent=2)
                 
-                # initial_videos = len(existing_file)
-                # after successfully writing JSON:
-                existing_file.add(video_id)
+        #         # initial_videos = len(existing_file)
+        #         # after successfully writing JSON:
+        #         existing_file.add(video_id)
                 
-                recent_video_ids.append(f"{date_part}_{safe_channel}_{video_id}") # for state.json
-                if latest_new_published_at is None:
-                    latest_new_published_at = published_at
+        #         recent_video_ids.append(f"{date_part}_{safe_channel}_{video_id}") # for state.json
+        #         if latest_new_published_at is None:
+        #             latest_new_published_at = published_at
                 
-            if stop: # if the video already exist in storage
-                break    
+        #     if stop: # if the video already exist in storage
+        #         break    
             
-            nextpagevalue = response.get("nextPageToken")
-            if not nextpagevalue:
-                print("No more pages available.",handle)
-                break
+        #     nextpagevalue = response.get("nextPageToken")
+        #     if not nextpagevalue:
+        #         print("No more pages available.",handle)
+        #         break
         
 
 
-        new_videos_pulled = len(existing_file) - initial_videos # how many new videos were pulled for a particular channel
-        print(
-            f"Channel {handle}: {new_videos_pulled} new videos downloaded, "
-             f"{failed_transcript} transcripts unavailable."
-        )
+        # new_videos_pulled = len(existing_file) - initial_videos # how many new videos were pulled for a particular channel
+        # print(
+        #     f"Channel {handle}: {new_videos_pulled} new videos downloaded, "
+        #      f"{failed_transcript} transcripts unavailable."
+        # )
 
-        # state.json logic (insight for every new run for each channel)
-        state_now_utc = datetime.now(timezone.utc)
+        # # state.json logic (insight for every new run for each channel)
+        # state_now_utc = datetime.now(timezone.utc)
 
-        if recent_video_ids == []:
-            latest_new_published_at = None
-        else:
-            latest_new_published_at = latest_new_published_at
-            # latest_date_part = latest_new_published_at[:10]
+        # if recent_video_ids == []:
+        #     latest_new_published_at = None
+        # else:
+        #     latest_new_published_at = latest_new_published_at
+        #     # latest_date_part = latest_new_published_at[:10]
 
-        # this work with the state_json["indexed_video_ids"] so it doesnt overwrite the state.json file and we can keep a tracked record of all the "indexed videos while also update recently added videos
-        state_path = os.path.join(channel_folder, "state.json")
+        # # this work with the state_json["indexed_video_ids"] so it doesnt overwrite the state.json file and we can keep a tracked record of all the "indexed videos while also update recently added videos
+        # state_path = os.path.join(channel_folder, "state.json")
 
-        # 1. Load existing state (MERGE behavior)
-        if os.path.exists(state_path):
-            with open(state_path, "r", encoding="utf-8") as f:
-                state_json = json.load(f)
-        else:
-            state_json = {}
+        # # 1. Load existing state (MERGE behavior)
+        # if os.path.exists(state_path):
+        #     with open(state_path, "r", encoding="utf-8") as f:
+        #         state_json = json.load(f)
+        # else:
+        #     state_json = {}
 
-        # 2. Update only the keys store_data controls
-        state_json["last_checked_at"] = state_now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-        state_json["latest_video_published_at"] = latest_new_published_at
-        state_json["recent_video_ids"] = recent_video_ids
+        # # 2. Update only the keys store_data controls
+        # state_json["last_checked_at"] = state_now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+        # state_json["latest_video_published_at"] = latest_new_published_at
+        # state_json["recent_video_ids"] = recent_video_ids
 
-        # 3. Write back to state.json
-        with open(state_path, "w", encoding="utf-8") as f:
-            json.dump(state_json, f, ensure_ascii=False, indent=2)
+        # # 3. Write back to state.json
+        # with open(state_path, "w", encoding="utf-8") as f:
+        #     json.dump(state_json, f, ensure_ascii=False, indent=2)
 
 
 
