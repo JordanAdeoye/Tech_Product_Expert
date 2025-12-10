@@ -1,6 +1,8 @@
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from io import BytesIO
+
 from dotenv import load_dotenv
 import os
 import json
@@ -228,7 +230,7 @@ def store_data():
         rows = supabase.table("Videos").select("video_id").eq("channel_id", channel_uuid).execute().data
 
         existing_file = {row["video_id"] for row in rows}
-
+        initial_videos = len(existing_file)
 
 
         # writing next page logic
@@ -266,48 +268,65 @@ def store_data():
 
 
         #         # save the raw transcript text to txt file in data/{channel}/raw/raw_text
-        #         txt_filename = f"{date_part}_{safe_channel}_{video_id}.txt" # 2025-10-30_Marques_Brownlee_rU9aqBv0YdY
+                txt_filename = f"{date_part}_{safe_channel}_{video_id}.txt" # 2025-10-30_Marques_Brownlee_rU9aqBv0YdY
         #         json_filename = f"{date_part}_{safe_channel}_{video_id}.json" # 2025-10-30_Marques_Brownlee_rU9aqBv0YdY
                 
 
-        #         now_utc = datetime.now(timezone.utc) # time transcript was fetched 
+                now_utc = datetime.now(timezone.utc) # time transcript was fetched 
 
-                
-        #         if raw_text: # if raw_text(transcript) is all good
-        #             # write transcript file
-        #             txt_path_abs = os.path.join(raw_text_dir, txt_filename) # txt file for the transcript to be saved
-        #             with open(txt_path_abs, "w", encoding="utf-8") as fh:
-        #                 fh.write(raw_text)
+                transcript_path = f"{handle}/{txt_filename}",
+                if raw_text: # if raw_text(transcript) is all good
+                    # write transcript file
+                    raw_bytes = raw_text.encode("utf-8")
+                    response = (
+                        supabase.storage
+                        .from_("transcripts")
+                        .upload(
+                            file=BytesIO(raw_bytes),
+                            path=transcript_path,
+                            file_options={"cache-control": "3600", "upsert": "false"}
+                        )
+                    )
 
-        #             status = "fetched"
-        #             transcript_source = "supadata" # dont hard code this (if i use the function then)
-        #             transcript_fetched_at = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-        #             file_path_raw = os.path.join("raw", "raw_text", txt_filename)  # store RELATIVE path in JSON
+                    status = "fetched"
+                    transcript_source = "supadata" # dont hard code this (if i use the function then)
+                    transcript_fetched_at = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    # file_path_raw = os.path.join("raw", "raw_text", txt_filename)  # store RELATIVE path in JSON
 
-        #         else: #if raw_text fails for any reason
-        #             status = "unavailable"      # or "unavailable" if you won't retry
-        #             transcript_source = "unavailable"
-        #             transcript_fetched_at = None
-        #             file_path_raw = None
+                else: #if raw_text fails for any reason
+                    status = "unavailable"      # or "unavailable" if you won't retry
+                    transcript_source = "unavailable"
+                    transcript_fetched_at = None
+                    file_path_raw = None
 
-        #         video_info = {
-        #             "channel_title": channel_title,
-        #             "channel_id": username_id,
-        #             "language": safe_detect_language(raw_text) if raw_text else None,
-        #             "video_title": items["snippet"]["title"],
-        #             "description": items["snippet"]["description"],
-        #             "published_at": published_at,
-        #             "video_id": video_id,
-        #             "transcript_source": transcript_source,
-        #             "transcript_fetched_at": transcript_fetched_at,
-        #             "status": status,
-        #             "run_id": run_id,
-        #             "video_link": video_starter_link + items["contentDetails"]["videoId"],
-        #             "file_path_raw": file_path_raw,   # prefer this key over embedding text
-        #         }
+                video_info = {
+                    "channel_id":channel_uuid,
+                    "language": safe_detect_language(raw_text) if raw_text else None,#
+                    "title": items["snippet"]["title"],
+                    "description": items["snippet"]["description"], #
+                    "published_at": published_at,#
+                    "video_id": video_id, #
+                    "transcript_source": transcript_source,#
+                    "transcript_fetched_at": transcript_fetched_at, #
+                    "transcript_status": status,
+                    "run_id": run_id,
+                    "video_link": video_starter_link + items["contentDetails"]["videoId"],#
+                    "transcript_path": file_path_raw,   # prefer this key over embedding text
+                    "is_indexed": False
+                }
         #         # print("\n")
         #         # print(video_info["raw_transcript"]) 
                 
+                res_channel = (
+                    supabase.table("Videos")
+                    .upsert([video_info],
+                        on_conflict="video_id",
+                     default_to_null=True)
+                .execute()
+                )
+
+                latest_new_published_at = published_at
+
 
         #         json_path_abs = os.path.join(channel_folder, "raw", json_filename) # json files for the json(video_info) to be saved
         #         with open(json_path_abs, "w", encoding="utf-8") as f:
@@ -321,25 +340,26 @@ def store_data():
         #         if latest_new_published_at is None:
         #             latest_new_published_at = published_at
                 
-        #     if stop: # if the video already exist in storage
-        #         break    
-            
-        #     nextpagevalue = response.get("nextPageToken")
-        #     if not nextpagevalue:
-        #         print("No more pages available.",handle)
-        #         break
+            if stop: # if the video already exist in storage
+                break   
+
+
+            nextpagevalue = response.get("nextPageToken")
+            if not nextpagevalue:
+                print("No more pages available.",handle)
+                break
         
 
 
-        # new_videos_pulled = len(existing_file) - initial_videos # how many new videos were pulled for a particular channel
-        # print(
-        #     f"Channel {handle}: {new_videos_pulled} new videos downloaded, "
-        #      f"{failed_transcript} transcripts unavailable."
-        # )
+        new_videos_pulled = len(existing_file) - initial_videos # how many new videos were pulled for a particular channel
+        print(
+            f"Channel {handle}: {new_videos_pulled} new videos downloaded, "
+             f"{failed_transcript} transcripts unavailable."
+        )
 
-        # # state.json logic (insight for every new run for each channel)
-        # state_now_utc = datetime.now(timezone.utc)
-
+        # state.json logic (insight for every new run for each channel)
+        state_now_utc = datetime.now(timezone.utc)
+        last_checked_at = state_now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
         # if recent_video_ids == []:
         #     latest_new_published_at = None
         # else:
@@ -364,7 +384,14 @@ def store_data():
         # # 3. Write back to state.json
         # with open(state_path, "w", encoding="utf-8") as f:
         #     json.dump(state_json, f, ensure_ascii=False, indent=2)
-
+        res_channel = (
+            supabase.table("Channels")
+            .upsert([{"youtube_channel_id": username_id,"handle":handle,"channel_title":title,
+                      "latest_new_published_at":latest_new_published_at,"last_checked_at":last_checked_at}],
+                on_conflict="youtube_channel_id",
+                default_to_null=True)
+            .execute()
+            )
 
 
 
