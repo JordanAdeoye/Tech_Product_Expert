@@ -12,13 +12,18 @@ from dotenv import load_dotenv
 # import download_transcript
 # import manifest
 from supabase import create_client, Client
+
+
+
+
+load_dotenv()
+API_KEY_CHROMA =  os.getenv("API_KEY_CHROMA")
+CHROMA_TENANT_ID=os.getenv("CHROMA_TENANT_ID"),
+CHROMA_DATABASE=os.getenv("CHROMA_DATABASE")
 url: str = os.getenv("SUPABASE_URL")
 key: str = os.getenv("SUPABASE_KEY")
 
 supabase: Client = create_client(url, key)
-
-load_dotenv()
-
 """
 THIS SCRIPT DOES THE CLEANING AND CHUNKING AND INDEXING(STORES CHUNKS IN A VECTOR DATABASE)
 
@@ -48,12 +53,12 @@ This script runs AFTER youtube_fetch_pipeline.py.
 import chromadb
 
 client = chromadb.CloudClient(
-  api_key='ck-PNrjbeJqd1LfjyPydqn4Vmob7Z1Yi1ksLKsWaCoq4Sq',
+  api_key=API_KEY_CHROMA,
   tenant='773b8251-c9e1-4fc6-8c7b-5b0df9dfa05f',
-  database='youtube_transcripts'
+  database=CHROMA_DATABASE
 )
 
-collection = client.get_or_create_collection(name="youtube_transcripts")
+collection = client.get_or_create_collection("youtube_transcripts")
 
 def clean_transcript(text: str) -> str:
     if not text:
