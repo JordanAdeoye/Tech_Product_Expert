@@ -11,7 +11,11 @@ import os
 from dotenv import load_dotenv
 # import download_transcript
 # import manifest
+from supabase import create_client, Client
+url: str = os.getenv("SUPABASE_URL")
+key: str = os.getenv("SUPABASE_KEY")
 
+supabase: Client = create_client(url, key)
 
 load_dotenv()
 
@@ -38,8 +42,16 @@ This script runs AFTER youtube_fetch_pipeline.py.
 """
 
 
+# import chromadb
+# client = chromadb.PersistentClient("./chroma_data")
+
 import chromadb
-client = chromadb.PersistentClient("./chroma_data")
+
+client = chromadb.CloudClient(
+  api_key='ck-PNrjbeJqd1LfjyPydqn4Vmob7Z1Yi1ksLKsWaCoq4Sq',
+  tenant='773b8251-c9e1-4fc6-8c7b-5b0df9dfa05f',
+  database='youtube_transcripts'
+)
 
 collection = client.get_or_create_collection(name="youtube_transcripts")
 
@@ -91,11 +103,26 @@ def chunk_up(text: str):
 
 
 
-def indexing(nodes,filenames):
+def indexing(nodes,transcript_path):
     length_node = len(nodes)
     chunked_text = [nodes[i].get_content() for i in range(length_node)]
-    with open(filenames,"r",encoding="utf-8") as f:
-        dict_data = json.load(f)
+
+    response = (
+            supabase.table("Videos")
+                .select("video_id",
+                        "video_link",
+                        "published_at",
+                        "title",
+                        "Channels(channel_title)").eq("transcript_path",transcript_path)
+                .execute()
+    )
+
+    if not response.data:
+        print(f"No video row found for transcript_path={transcript_path}")
+        return False
+    
+    dict_data = response.data[0]
+    # print(response.data[0])
 
     chunked_key =  [f"{dict_data['video_id']}_{i}" for i in range(length_node)] # used for ids in vectordb (e.g 'bMou1qUMHC4_0')
     # print(dict_data["video_id"])
@@ -113,8 +140,8 @@ def indexing(nodes,filenames):
         metadatas=[
             {
                 "video_id": dict_data["video_id"],
-                "channel_title": dict_data["channel_title"],
-                "video_title": dict_data["video_title"],
+                "channel_title": dict_data["Channels"]["channel_title"],
+                "video_title": dict_data["title"],
                 "published_at": dict_data["published_at"],
                 "video_link": dict_data["video_link"],
                 "chunk_index": idx,
@@ -129,67 +156,46 @@ def indexing(nodes,filenames):
 
 
 def chunk_and_index():
-    txt_file_ext = ".txt"
-    json_file_ext = ".json"
-    # youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia"]
-    youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia","@Mrwhosetheboss",
-                    "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
-                    "@ScatterVolt","@paulshardware"]
-    raw = "raw"
-    raw_text = "raw/raw_text"
-    data_folder = "./data"
+    # get all videos that have a fetched transcript but not yet indexe
+    res_video = (
+        supabase.table("Videos")
+            .select("transcript_path").eq("is_indexed",False).eq("transcript_status","fetched")
+            .execute()
+    )
+    if not res_video.data:
+        print("no new video to index")
+        return
 
-    for channel in youtube_channels:
-        path = os.path.join(data_folder,channel,'state.json')
-
-        # print(path)
-
-        with open(path, "r", encoding="utf-8") as f:
-                state = json.load(f)
+    for row in res_video.data:
+        transcript_path = row.get("transcript_path")
+        if not transcript_path:
+            continue
         
-        # make sure the key exists
-        if "indexed_video_ids" not in state:
-            state["indexed_video_ids"] = []
+        print("Indexing:", transcript_path)
 
-        print(state["recent_video_ids"])
+        # Download transcript from bucket
+        res_bucket = (
+            supabase.storage
+            .from_("transcripts")
+            .download(transcript_path)
+        )
 
-        if state["recent_video_ids"]:   
+        data = res_bucket.decode("utf-8")
+        # Clean + chunk        
+        cleaned_transcript = clean_transcript(data)
+        nodes = chunk_up(cleaned_transcript)
 
-            # Track videos indexed in THIS run
-            indexed_this_run = []
-
-            
-            for i in state["recent_video_ids"]:
-                if i in state["indexed_video_ids"]: # in this case if for any reason store_data() and index.py ever get out of sync, it’s nice to defensively skip already-indexed videos
-                    continue
-                path_transcript = os.path.join(data_folder, channel, "raw", "raw_text", i + ".txt")
-                
-                if not os.path.exists(path_transcript):
-                    print("Transcript missing, skipping:", i) # if transcript is missing in text file folder skip it
-                    continue
-
-                with open(path_transcript,"r", encoding="utf-8") as f:
-                    data = f.read()
-                
-                cleaned_transcript = clean_transcript(data)
-                nodes = chunk_up(cleaned_transcript)
-                # indexing 
-                filename_json = os.path.join(data_folder, channel, "raw" ,i+".json") # get the json data for the metadata in your vectordb "./data/@mkbhd/raw/2025-07-09_Marques_Brownlee_bMou1qUMHC4.json"
-                result = indexing(nodes,filename_json)
-
-                indexed_this_run.append(i)
-
-            # Append all at once
-            for vid in indexed_this_run:
-                if vid not in state["indexed_video_ids"]:
-                    state["indexed_video_ids"].append(vid)
-
-            # Write state.json ONCE per channel
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(state, f, ensure_ascii=False, indent=2)
-
+        # Index into Chroma
+        result = indexing(nodes,transcript_path)
+        
+        # Mark as indexed if successful
+        if result:
+            supabase.table("Videos") \
+                .update({"is_indexed": True}) \
+                .eq("transcript_path", transcript_path) \
+                .execute()
         else:
-            print("no new video to index")
+            print("Indexing failed for:", transcript_path)
 
 
 if __name__ == "__main__":

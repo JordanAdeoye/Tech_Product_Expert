@@ -25,12 +25,11 @@ DetectorFactory.seed = 0  # makes results reproducible
 # UULFBJycsmduvYEL83R_U4JriQ - playlist id
 
 # youtube channels usersnames
-youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia","@Mrwhosetheboss",
-                    "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
-                    "@ScatterVolt","@paulshardware"]
-
-# youtube_channels = ["@austinevans","@CreatedbyEllaYT","@ShortCircuit",
+# youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia","@Mrwhosetheboss",
+#                     "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
 #                     "@ScatterVolt","@paulshardware"]
+
+youtube_channels = ["@mkbhd","@unboxtherapy"]
 
 
 
@@ -106,7 +105,7 @@ def get_youtube_channel_playlist(id,nextpage=None):
     
     request = youtube.playlistItems().list(
         part="contentDetails,id,snippet,status",
-        maxResults=50,
+        maxResults=10,
         pageToken = nextpage,
         playlistId="UULF"+id[2:] # allows api to returns all videos except shorts
     )
@@ -204,16 +203,45 @@ def supadata_error_handler(url, videoid):
     return None
 
 
+import requests
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+def upload_transcript_bytes(transcript_path: str, raw_text: str) -> None:
+    """
+    Upload transcript text directly to Supabase Storage (bucket: transcripts)
+    using raw bytes, no local files.
+
+    transcript_path: e.g. "UCBJycsmduvYEL83R_U4JriQ/raw/yWBz2qZJ8zY.txt"
+    """
+    if SUPABASE_URL is None or SUPABASE_KEY is None:
+        raise RuntimeError("SUPABASE_URL or SUPABASE_KEY not set")
+
+    url = f"{SUPABASE_URL}/storage/v1/object/transcripts/{transcript_path}"
+
+    resp = requests.post(
+        url,
+        headers={
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "apikey": SUPABASE_KEY,
+            "Content-Type": "text/plain; charset=utf-8",
+            "x-upsert": "false",  # don't overwrite existing transcripts
+        },
+        data=raw_text.encode("utf-8"),
+        timeout=30,
+    )
+    resp.raise_for_status()
 
 
 
 
 def store_data():
-    folder_path = "/Users/adeoyedipo/Projects/Tech_Product_Expert/data"
-
-    run_id = datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
+    
+    video_rows = []
     for handle in youtube_channels: # per channel
 
+        
         username_id,title = get_youtube_channel_id(handle)
 
         # load youtube channel data into supabase database (Channel table)
@@ -224,6 +252,11 @@ def store_data():
             default_to_null=True)
         .execute()
         )
+
+        previous = res_channel.data[0].get("latest_video_published_at")
+        latest_new_published_at = previous  # fallback to existing value
+
+
         # get the pk for each row(youtube channle)
         channel_uuid = res_channel.data[0]["id"]
         # check for existing videos in the Video table filter by pk as it is fk in the videos 
@@ -269,35 +302,27 @@ def store_data():
 
         #         # save the raw transcript text to txt file in data/{channel}/raw/raw_text
                 txt_filename = f"{date_part}_{safe_channel}_{video_id}.txt" # 2025-10-30_Marques_Brownlee_rU9aqBv0YdY
-        #         json_filename = f"{date_part}_{safe_channel}_{video_id}.json" # 2025-10-30_Marques_Brownlee_rU9aqBv0YdY
                 
 
                 now_utc = datetime.now(timezone.utc) # time transcript was fetched 
 
-                transcript_path = f"{handle}/{txt_filename}",
+                transcript_path = f"{handle}/{txt_filename}" # store bucket path to text file
+                # transcript_path = f"{username_id}/raw/{video_id}.txt"
+
                 if raw_text: # if raw_text(transcript) is all good
-                    # write transcript file
-                    raw_bytes = raw_text.encode("utf-8")
-                    response = (
-                        supabase.storage
-                        .from_("transcripts")
-                        .upload(
-                            file=BytesIO(raw_bytes),
-                            path=transcript_path,
-                            file_options={"cache-control": "3600", "upsert": "false"}
-                        )
-                    )
+                   
+                    upload_transcript_bytes(transcript_path, raw_text)
 
                     status = "fetched"
                     transcript_source = "supadata" # dont hard code this (if i use the function then)
                     transcript_fetched_at = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-                    # file_path_raw = os.path.join("raw", "raw_text", txt_filename)  # store RELATIVE path in JSON
+                      
 
                 else: #if raw_text fails for any reason
                     status = "unavailable"      # or "unavailable" if you won't retry
                     transcript_source = "unavailable"
                     transcript_fetched_at = None
-                    file_path_raw = None
+                    transcript_path = None
 
                 video_info = {
                     "channel_id":channel_uuid,
@@ -309,36 +334,20 @@ def store_data():
                     "transcript_source": transcript_source,#
                     "transcript_fetched_at": transcript_fetched_at, #
                     "transcript_status": status,
-                    "run_id": run_id,
                     "video_link": video_starter_link + items["contentDetails"]["videoId"],#
-                    "transcript_path": file_path_raw,   # prefer this key over embedding text
+                    "transcript_path": transcript_path,   # prefer this key over embedding text
                     "is_indexed": False
                 }
         #         # print("\n")
         #         # print(video_info["raw_transcript"]) 
+                video_rows.append(video_info)
                 
-                res_channel = (
-                    supabase.table("Videos")
-                    .upsert([video_info],
-                        on_conflict="video_id",
-                     default_to_null=True)
-                .execute()
-                )
 
-                latest_new_published_at = published_at
+                existing_file.add(video_id)
+                if latest_new_published_at is None or published_at > latest_new_published_at:
+                    latest_new_published_at = published_at
 
 
-        #         json_path_abs = os.path.join(channel_folder, "raw", json_filename) # json files for the json(video_info) to be saved
-        #         with open(json_path_abs, "w", encoding="utf-8") as f:
-        #             json.dump(video_info, f, ensure_ascii=False, indent=2)
-                
-        #         # initial_videos = len(existing_file)
-        #         # after successfully writing JSON:
-        #         existing_file.add(video_id)
-                
-        #         recent_video_ids.append(f"{date_part}_{safe_channel}_{video_id}") # for state.json
-        #         if latest_new_published_at is None:
-        #             latest_new_published_at = published_at
                 
             if stop: # if the video already exist in storage
                 break   
@@ -357,41 +366,26 @@ def store_data():
              f"{failed_transcript} transcripts unavailable."
         )
 
-        # state.json logic (insight for every new run for each channel)
+        #insight for every new run for each channel
         state_now_utc = datetime.now(timezone.utc)
         last_checked_at = state_now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-        # if recent_video_ids == []:
-        #     latest_new_published_at = None
-        # else:
-        #     latest_new_published_at = latest_new_published_at
-        #     # latest_date_part = latest_new_published_at[:10]
-
-        # # this work with the state_json["indexed_video_ids"] so it doesnt overwrite the state.json file and we can keep a tracked record of all the "indexed videos while also update recently added videos
-        # state_path = os.path.join(channel_folder, "state.json")
-
-        # # 1. Load existing state (MERGE behavior)
-        # if os.path.exists(state_path):
-        #     with open(state_path, "r", encoding="utf-8") as f:
-        #         state_json = json.load(f)
-        # else:
-        #     state_json = {}
-
-        # # 2. Update only the keys store_data controls
-        # state_json["last_checked_at"] = state_now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-        # state_json["latest_video_published_at"] = latest_new_published_at
-        # state_json["recent_video_ids"] = recent_video_ids
-
-        # # 3. Write back to state.json
-        # with open(state_path, "w", encoding="utf-8") as f:
-        #     json.dump(state_json, f, ensure_ascii=False, indent=2)
+        
         res_channel = (
             supabase.table("Channels")
             .upsert([{"youtube_channel_id": username_id,"handle":handle,"channel_title":title,
-                      "latest_new_published_at":latest_new_published_at,"last_checked_at":last_checked_at}],
+                      "latest_video_published_at":latest_new_published_at,"last_checked_at":last_checked_at}],
                 on_conflict="youtube_channel_id",
                 default_to_null=True)
             .execute()
             )
+    # bulk upload of videos data to the video table    
+    res_channel = (
+                    supabase.table("Videos")
+                    .upsert(video_rows,
+                        on_conflict="video_id",
+                     default_to_null=True)
+                .execute()
+                )
 
 
 
