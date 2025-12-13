@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 # import download_transcript
 # import manifest
 from supabase import create_client, Client
+from datetime import datetime, timezone
 
 
 
@@ -47,8 +48,6 @@ This script runs AFTER youtube_fetch_pipeline.py.
 """
 
 
-# import chromadb
-# client = chromadb.PersistentClient("./chroma_data")
 
 import chromadb
 
@@ -78,20 +77,7 @@ def clean_transcript(text: str) -> str:
     return text
 
 
-# OPEN_API_KEY = os.getenv('OPEN_API_KEY')
-# embed_model = OpenAIEmbedding(
-#     model="text-embedding-3-small",
-#     api_key=OPEN_API_KEY)
 
-# splitter = SemanticSplitterNodeParser(
-#     buffer_size=1, breakpoint_percentile_threshold=95, embed_model=embed_model
-# )
-
-# def chunk_up(text: str):
-
-#     doc = Document(text=text)
-#     nodes = splitter.get_nodes_from_documents([doc])
-#     return nodes
 
 base_splitter = SentenceSplitter(chunk_size=2000)  # you can tune size
 
@@ -195,8 +181,10 @@ def chunk_and_index():
         
         # Mark as indexed if successful
         if result:
+            indexed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            
             supabase.table("Videos") \
-                .update({"is_indexed": True}) \
+                .update({"is_indexed": True, "indexed_at":indexed_at}) \
                 .eq("transcript_path", transcript_path) \
                 .execute()
         else:

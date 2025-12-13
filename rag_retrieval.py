@@ -32,8 +32,7 @@ from langchain_classic.chains import RetrievalQA,ConversationalRetrievalChain
 import rag_indexing_pipeline
 
 
-# rag_retrieval.py
-# query_data
+
 
 """
 Online RAG retrieval module.
@@ -65,9 +64,7 @@ from langchain_classic.prompts import PromptTemplate
 
 from datetime import datetime
 import re
-# from langchain.prompts import PromptTemplate
-# from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-# from langchain_chroma import Chroma
+
 
 
 """
@@ -242,7 +239,6 @@ def query_data_rag(query, client):
         client=client,                  # your chromadb client
         collection_name="youtube_transcripts",
         embedding_function=embeddings_retrival,
-        persist_directory="./chroma_data",
     )
 
     llm = ChatOpenAI(

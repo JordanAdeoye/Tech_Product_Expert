@@ -21,8 +21,6 @@ supabase: Client = create_client(url, key)
 
 DetectorFactory.seed = 0  # makes results reproducible
 
-# UCBJycsmduvYEL83R_U4JriQ - marquees brownlee id
-# UULFBJycsmduvYEL83R_U4JriQ - playlist id
 
 # youtube channels usersnames
 # youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia","@Mrwhosetheboss",
@@ -58,9 +56,6 @@ This script:
 This script runs BEFORE rag_indexing_pipeline.py.
 """
 
-
-
-# youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia"]
 
 load_dotenv()
 
@@ -239,6 +234,8 @@ def upload_transcript_bytes(transcript_path: str, raw_text: str) -> None:
 def store_data():
     
     video_rows = []
+    logs = []
+    run_id = datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
     for handle in youtube_channels: # per channel
 
         
@@ -338,9 +335,19 @@ def store_data():
                     "transcript_path": transcript_path,   # prefer this key over embedding text
                     "is_indexed": False
                 }
+                ingested_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                
+                log_info = {
+                    "channel_id":channel_uuid,
+                    "video_id": video_id, #
+                    "ingested_at": ingested_utc,
+                    "run_id": run_id
+                }
         #         # print("\n")
         #         # print(video_info["raw_transcript"]) 
                 video_rows.append(video_info)
+
+                logs.append(log_info)
                 
 
                 existing_file.add(video_id)
@@ -369,7 +376,8 @@ def store_data():
         #insight for every new run for each channel
         state_now_utc = datetime.now(timezone.utc)
         last_checked_at = state_now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-        
+
+        # Channels
         res_channel = (
             supabase.table("Channels")
             .upsert([{"youtube_channel_id": username_id,"handle":handle,"channel_title":title,
@@ -378,25 +386,29 @@ def store_data():
                 default_to_null=True)
             .execute()
             )
-    # bulk upload of videos data to the video table    
-    res_channel = (
-                    supabase.table("Videos")
-                    .upsert(video_rows,
-                        on_conflict="video_id",
-                     default_to_null=True)
-                .execute()
-                )
-
+        
+    # bulk upload of videos data to the video table  
+    if video_rows:   
+        res_video = (
+                        supabase.table("Videos")
+                        .upsert(video_rows,
+                            on_conflict="video_id",
+                        default_to_null=True)
+                    .execute()
+                    )
+# logs
+    if logs:
+        res_log = (
+                        supabase.table("Logs")
+                        .upsert(logs,
+                            on_conflict="video_id",
+                        default_to_null=True)
+                    .execute()
+                    )
+    
 
 
 store_data()
         
-# i will like to use the txt folder to check for new files cause if a transcript fails it does have a txt file
-# cause if it fails even with the backoff handling i will still want to try it again , i might have to include failed transcript in state.json so it can be tried again
-
-# if it failed to download transcript dont put in recent_video_ids
-
-# also need to fix how you are doing indexing, add processed id to state.json
-
 
 

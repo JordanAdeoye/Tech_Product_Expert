@@ -2,12 +2,11 @@ import streamlit as st
 
 
 from rag_retrieval import query_data_rag
+import rag_indexing_pipeline
 
 
 import chromadb
-client = chromadb.PersistentClient("./chroma_data")
 
-collection = client.get_or_create_collection(name="youtube_transcripts")
 st.title("Tech Expert")
 
 # Initialize chat history
@@ -29,7 +28,7 @@ if prompt := st.chat_input("What is up?"):
     # response = f"Echo: {prompt}"
     # Display assistant response in chat message container
     with st.chat_message("assistant"):
-        response = st.write_stream(query_data_rag(prompt,client))
+        response = st.write_stream(query_data_rag(prompt,rag_indexing_pipeline.client))
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": response})
 
