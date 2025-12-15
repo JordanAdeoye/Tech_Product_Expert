@@ -1,37 +1,35 @@
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
+# from googleapiclient.discovery import build 1
+# from google_auth_oauthlib.flow import InstalledAppFlow 2
+# from google.auth.transport.requests import Request 3
 from dotenv import load_dotenv
 import os
-import json
+
 # from saving_transcript import raw_transcript
 import time
 # from langdetect import detect
-from datetime import datetime, timezone
-from langdetect import detect, DetectorFactory, LangDetectException
-from supadata import errors as supadata_errors
+# from datetime import datetime, timezone 4
+# from langdetect import detect, DetectorFactory, LangDetectException 5
+# from supadata import errors as supadata_errors 6
 
-from llama_index.core import Document
-from llama_index.core.node_parser import (
-    SentenceSplitter,
-    SemanticSplitterNodeParser,
-)
-from llama_index.embeddings.openai import OpenAIEmbedding
-import json
-import tiktoken
+# from llama_index.core import Document 7
+# from llama_index.core.node_parser import (
+#     SentenceSplitter,
+#     SemanticSplitterNodeParser,
+# ) 8
+# from llama_index.embeddings.openai import OpenAIEmbedding 8
 import re
-import os
-from dotenv import load_dotenv
 
-import chromadb
+
+# import chromadb 9
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings,ChatOpenAI
 
-from langchain_classic.chains import RetrievalQA,ConversationalRetrievalChain
+# from langchain_classic.chains import RetrievalQA,ConversationalRetrievalChain 10 do something with this
 
-import rag_indexing_pipeline
+# import rag_indexing_pipeline  11
 
-
+from langchain_classic.prompts import PromptTemplate
+from datetime import datetime
 
 
 """
@@ -56,14 +54,7 @@ OPEN_API_KEY = os.getenv('OPEN_API_KEY')
 
 
 
-from langchain_classic.prompts import PromptTemplate
 
-
-
-
-
-from datetime import datetime
-import re
 
 
 

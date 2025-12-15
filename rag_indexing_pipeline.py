@@ -4,15 +4,12 @@ from llama_index.core.node_parser import (
     SemanticSplitterNodeParser,
 )
 from llama_index.embeddings.openai import OpenAIEmbedding
-import json
-import tiktoken
 import re
 import os
 from dotenv import load_dotenv
-# import download_transcript
-# import manifest
 from supabase import create_client, Client
 from datetime import datetime, timezone
+import chromadb
 
 
 
@@ -31,8 +28,6 @@ THIS SCRIPT DOES THE CLEANING AND CHUNKING AND INDEXING(STORES CHUNKS IN A VECTO
 IT ALSO KEEPS TRACK OF INDEXED FILE SO YOU DONT INDEX FILE THAT HAVE ALREADY BEEN STORED IN A VECTORDB EACH RUN
 """
 
-# rag_indexing_pipeline.py
-#chunk_vector.py
 """
 Stage 2 of the RAG data pipeline.
 
@@ -49,7 +44,7 @@ This script runs AFTER youtube_fetch_pipeline.py.
 
 
 
-import chromadb
+
 
 client = chromadb.CloudClient(
   api_key=API_KEY_CHROMA,

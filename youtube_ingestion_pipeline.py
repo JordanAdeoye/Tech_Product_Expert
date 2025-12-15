@@ -1,17 +1,18 @@
 from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from io import BytesIO
+#from google_auth_oauthlib.flow import InstalledAppFlow 1
+#from google.auth.transport.requests import Request 2
+#from io import BytesIO 3
 
 from dotenv import load_dotenv
 import os
-import json
+#import json 4
 from supadata_transcript_fetcher import raw_transcript
 import time
 # from langdetect import detect
 from datetime import datetime, timezone
 from langdetect import detect, DetectorFactory, LangDetectException
 from supadata import errors as supadata_errors
+import requests 
 
 from supabase import create_client, Client
 url: str = os.getenv("SUPABASE_URL")
@@ -198,7 +199,7 @@ def supadata_error_handler(url, videoid):
     return None
 
 
-import requests
+
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -389,22 +390,16 @@ def store_data():
         
     # bulk upload of videos data to the video table  
     if video_rows:   
-        res_video = (
-                        supabase.table("Videos")
-                        .upsert(video_rows,
+        supabase.table("Videos").upsert(video_rows,
                             on_conflict="video_id",
-                        default_to_null=True)
-                    .execute()
-                    )
+                        default_to_null=True).execute()
+
 # logs
     if logs:
-        res_log = (
-                        supabase.table("Logs")
-                        .upsert(logs,
+        supabase.table("Logs").upsert(logs,
                             on_conflict="video_id",
-                        default_to_null=True)
-                    .execute()
-                    )
+                        default_to_null=True).execute()
+                    
     
 
 
