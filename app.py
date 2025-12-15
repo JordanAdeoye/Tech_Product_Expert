@@ -5,8 +5,6 @@ from rag_retrieval import query_data_rag
 import rag_indexing_pipeline
 
 
-import chromadb
-
 st.title("Tech Expert")
 
 # Initialize chat history

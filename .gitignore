@@ -8,3 +8,4 @@ rag_project_env/
 rag_project/
 chroma_data
 __pycache__
+.ruff_cache

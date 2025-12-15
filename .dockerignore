@@ -8,3 +8,4 @@ rag_project_env/
 rag_project/
 __pycache__
 .gitignore
+.ruff_cache
