@@ -1,9 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
 import youtube_ingestion_pipeline 
-
+# import pytest
 from supadata.errors import SupadataError
 import requests
+from types import SimpleNamespace
 
 class TestYoutubeIngestion:
 
@@ -92,7 +92,7 @@ class TestYoutubeIngestion:
     @patch("youtube_ingestion_pipeline.raw_transcript")
     def test_rate_limit_then_success(self,mock_raw, mock_sleep):
         mock_raw.side_effect = [
-            SupadataError("limit-exceeded"),
+            SupadataError(429, "limit-exceeded", "{}"),
             "TRANSCRIPT TEXT"
         ]
 
@@ -108,7 +108,7 @@ class TestYoutubeIngestion:
     
     
     @patch("youtube_ingestion_pipeline.raw_transcript")
-    def test_rate_limit_then_success(self,mock_raw):
+    def test_transcript_unavailable_returns_none(self,mock_raw):
         mock_raw.side_effect = SupadataError(400,"transcript-unavailable","{}")
         result = youtube_ingestion_pipeline.supadata_error_handler(
             url="fake-url",
@@ -232,9 +232,6 @@ class TestYoutubeIngestion:
 
     
 
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
-import youtube_ingestion_pipeline
 
 
 def _sb_with_tables(channel_row, existing_video_ids):
@@ -330,7 +327,7 @@ def test_store_data_processes_one_new_video_and_writes_to_supabase(
     )
     mock_upload.assert_called_once()
     upload_path = mock_upload.call_args[0][0]
-    assert upload_path.startswith("unboxtherapy/")  # '@' stripped
+    assert upload_path.startswith("@unboxtherapy/")  # '@' stripped
     assert upload_path.endswith("_L2fBJCDEEJk.txt")
 
     # Assert: Videos bulk upsert called with one row

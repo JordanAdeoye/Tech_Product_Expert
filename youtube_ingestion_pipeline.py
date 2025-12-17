@@ -350,7 +350,7 @@ def store_data():
 
                 if raw_text: # if raw_text(transcript) is all good
                     try:
-                        upload_result = upload_transcript_bytes(transcript_path, raw_text)
+                        upload_transcript_bytes(transcript_path, raw_text)
 
                         status = "fetched" 
                         transcript_source = "supadata" # dont hard code this (if i use the function then)
