@@ -9,3 +9,4 @@ rag_project/
 chroma_data
 __pycache__
 .ruff_cache
+.pytest.ini

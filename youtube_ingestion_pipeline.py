@@ -15,10 +15,13 @@ from supadata import errors as supadata_errors
 import requests 
 
 from supabase import create_client, Client
-url: str = os.getenv("SUPABASE_URL")
-key: str = os.getenv("SUPABASE_KEY")
+import logging
+logger = logging.getLogger(__name__)
 
-supabase: Client = create_client(url, key)
+# url: str = os.getenv("SUPABASE_URL")
+# key: str = os.getenv("SUPABASE_KEY")
+
+# supabase: Client = create_client(url, key)
 
 DetectorFactory.seed = 0  # makes results reproducible
 
@@ -82,11 +85,6 @@ def get_youtube_channel_id(handle):
     username_id = response['items'][0]['id']
     title = response['items'][0]["snippet"]['title']
     return username_id,title
-
-
-
-
-
 
 
 
@@ -201,10 +199,35 @@ def supadata_error_handler(url, videoid):
 
 
 
+
+def supabase()-> Client | None:
+    """
+    Create and return Supabase client from environment variables.
+
+    Returns:
+        Supabase client if credentials are available, None otherwise
+    """
+     
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+
+    if not url or not key:
+        logger.warning("Supabase credentials not found in environment variables")
+        return None
+
+    return create_client(url, key)
+
+
+
+
+
+
+
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-def upload_transcript_bytes(transcript_path: str, raw_text: str) -> None:
+def upload_transcript_bytes(transcript_path: str, raw_text: str) -> str:
     """
     Upload transcript text directly to Supabase Storage (bucket: transcripts)
     using raw bytes, no local files.
@@ -227,13 +250,25 @@ def upload_transcript_bytes(transcript_path: str, raw_text: str) -> None:
         data=raw_text.encode("utf-8"),
         timeout=30,
     )
+    # Handle "already exists" gracefully
+    if resp.status_code == 409:
+        return "exists"
+    # because supabase returns a 400 error instead of a 409 error when an object already exist
+    if resp.status_code == 400:
+        body = (resp.text or "").lower()
+        # match common “already exists” signals
+        if "already exists" in body or "asset already exists" in body:
+            return "exists"
+
     resp.raise_for_status()
+    return "uploaded"
+    
 
 
 
 
 def store_data():
-    
+    sb = supabase()
     video_rows = []
     logs = []
     run_id = datetime.utcnow().strftime("run_%Y%m%d_%H%M%S")
@@ -244,7 +279,7 @@ def store_data():
 
         # load youtube channel data into supabase database (Channel table)
         res_channel = (
-        supabase.table("Channels")
+        sb.table("Channels")
         .upsert([{"youtube_channel_id": username_id,"handle":handle,"channel_title":title}],
             on_conflict="youtube_channel_id",
             default_to_null=True)
@@ -258,7 +293,7 @@ def store_data():
         # get the pk for each row(youtube channle)
         channel_uuid = res_channel.data[0]["id"]
         # check for existing videos in the Video table filter by pk as it is fk in the videos 
-        rows = supabase.table("Videos").select("video_id").eq("channel_id", channel_uuid).execute().data
+        rows = sb.table("Videos").select("video_id").eq("channel_id", channel_uuid).execute().data
 
         existing_file = {row["video_id"] for row in rows}
         initial_videos = len(existing_file)
@@ -281,11 +316,17 @@ def store_data():
                 safe_channel = channel_title.replace(" ", "_")
                 video_id = items["contentDetails"]["videoId"]
                 
-                # if the first video the api returns exist among the existing videos, break because that means they are no new video uploaded yet
-                if video_id in existing_file:
+                # Stop paging once we reach videos at or before the latest publish time
+                # already recorded in the database 
+                if previous is not None and published_at <= previous:
                     print("Hit existing item, stopping:", handle, date_part, video_id)
                     stop = True
                     break
+
+                # Skip videos that are already present in the database(deduplication) "will be rarely check/ just a fail safe" in case youtube change the order of the GET, right now it is newest to oldest
+                if video_id in existing_file:
+                    continue
+
 
 
                 time.sleep(2)
@@ -303,17 +344,27 @@ def store_data():
                 
 
                 now_utc = datetime.now(timezone.utc) # time transcript was fetched 
-
+                # handle = handle.lstrip("@")
                 transcript_path = f"{handle}/{txt_filename}" # store bucket path to text file
                 # transcript_path = f"{username_id}/raw/{video_id}.txt"
 
                 if raw_text: # if raw_text(transcript) is all good
-                   
-                    upload_transcript_bytes(transcript_path, raw_text)
+                    try:
+                        upload_result = upload_transcript_bytes(transcript_path, raw_text)
 
-                    status = "fetched"
-                    transcript_source = "supadata" # dont hard code this (if i use the function then)
-                    transcript_fetched_at = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+                        status = "fetched" 
+                        transcript_source = "supadata" # dont hard code this (if i use the function then)
+                        transcript_fetched_at = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+                    except requests.exceptions.RequestException as e:
+
+                        # Covers HTTPError, Timeout, ConnectionError, etc.
+                        print(f"[Storage] Upload failed for {video_id}: {e}")
+
+                        status = "upload_failed"
+                        transcript_source = "supadata"
+                        transcript_fetched_at = None
+                        transcript_path = None
                       
 
                 else: #if raw_text fails for any reason
@@ -324,7 +375,7 @@ def store_data():
 
                 video_info = {
                     "channel_id":channel_uuid,
-                    "language": safe_detect_language(raw_text) if raw_text else None,#
+                    "language": "en" if raw_text else None,#
                     "title": items["snippet"]["title"],
                     "description": items["snippet"]["description"], #
                     "published_at": published_at,#
@@ -352,15 +403,16 @@ def store_data():
                 
 
                 existing_file.add(video_id)
+                # updates latest_new_published_at in channel table
                 if latest_new_published_at is None or published_at > latest_new_published_at:
                     latest_new_published_at = published_at
 
 
-                
+            # if video already exist no need to check next page condition    
             if stop: # if the video already exist in storage
                 break   
 
-
+            # handle next page logic
             nextpagevalue = response.get("nextPageToken")
             if not nextpagevalue:
                 print("No more pages available.",handle)
@@ -377,10 +429,12 @@ def store_data():
         #insight for every new run for each channel
         state_now_utc = datetime.now(timezone.utc)
         last_checked_at = state_now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+        
+        # print(video_rows)
 
         # Channels
         res_channel = (
-            supabase.table("Channels")
+            sb.table("Channels")
             .upsert([{"youtube_channel_id": username_id,"handle":handle,"channel_title":title,
                       "latest_video_published_at":latest_new_published_at,"last_checked_at":last_checked_at}],
                 on_conflict="youtube_channel_id",
@@ -390,20 +444,21 @@ def store_data():
         
     # bulk upload of videos data to the video table  
     if video_rows:   
-        supabase.table("Videos").upsert(video_rows,
+        sb.table("Videos").upsert(video_rows,
                             on_conflict="video_id",
                         default_to_null=True).execute()
 
 # logs
     if logs:
-        supabase.table("Logs").upsert(logs,
+        sb.table("Logs").upsert(logs,
                             on_conflict="video_id",
+                            ignore_duplicates=True,
                         default_to_null=True).execute()
                     
     
 
-
-store_data()
+if __name__ == "__main__":
+    store_data()
         
 
 
