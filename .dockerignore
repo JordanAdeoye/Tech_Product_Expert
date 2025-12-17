@@ -9,4 +9,4 @@ rag_project/
 __pycache__
 .gitignore
 .ruff_cache
-.pytest.ini
+pytest.ini
