@@ -7,7 +7,7 @@ sys.path.insert(0, "/opt/airflow/project")
 
 from datetime import datetime,timedelta
 
-from airflow.sdk import DAG, task
+from airflow.sdk import DAG
 from airflow.providers.standard.operators.python import PythonOperator
 
 # # A Dag represents a workflow, a collection of tasks
@@ -41,8 +41,6 @@ from airflow.providers.standard.operators.python import PythonOperator
 
 #     t1 >> t2
 
-
-from datetime import datetime, timedelta
 
 
 def run_store_data():
