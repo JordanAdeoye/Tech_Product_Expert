@@ -16,7 +16,7 @@ import chromadb
 
 load_dotenv()
 API_KEY_CHROMA =  os.getenv("API_KEY_CHROMA")
-CHROMA_TENANT_ID=os.getenv("CHROMA_TENANT_ID"),
+CHROMA_TENANT_ID=os.getenv("CHROMA_TENANT_ID")
 CHROMA_DATABASE=os.getenv("CHROMA_DATABASE")
 url: str = os.getenv("SUPABASE_URL")
 key: str = os.getenv("SUPABASE_KEY")
@@ -48,7 +48,7 @@ This script runs AFTER youtube_fetch_pipeline.py.
 
 client = chromadb.CloudClient(
   api_key=API_KEY_CHROMA,
-  tenant='773b8251-c9e1-4fc6-8c7b-5b0df9dfa05f',
+  tenant=CHROMA_TENANT_ID,
   database=CHROMA_DATABASE
 )
 
@@ -186,17 +186,17 @@ def chunk_and_index():
             print("Indexing failed for:", transcript_path)
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__" or :
 
-    OPEN_API_KEY = os.getenv('OPEN_API_KEY')
-    embed_model = OpenAIEmbedding(
-        model="text-embedding-3-small",
-        api_key=OPEN_API_KEY)
+OPEN_API_KEY = os.getenv('OPEN_API_KEY')
+embed_model = OpenAIEmbedding(
+    model="text-embedding-3-small",
+    api_key=OPEN_API_KEY)
 
-    splitter = SemanticSplitterNodeParser(
-        buffer_size=1, breakpoint_percentile_threshold=95, embed_model=embed_model
-    )
+splitter = SemanticSplitterNodeParser(
+    buffer_size=1, breakpoint_percentile_threshold=95, embed_model=embed_model
+)
 
-    chunk_and_index()
+chunk_and_index()
 
 

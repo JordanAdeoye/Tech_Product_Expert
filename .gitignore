@@ -10,3 +10,5 @@ chroma_data
 __pycache__
 .ruff_cache
 pytest.ini
+airflow-docker/logs
+airflow-docker/plugins

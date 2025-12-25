@@ -457,8 +457,8 @@ def store_data():
                     
     
 
-if __name__ == "__main__":
-    store_data()
+# if __name__ == "__main__":
+#     store_data()
         
 
 
