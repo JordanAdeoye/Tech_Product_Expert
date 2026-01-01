@@ -1,5 +1,5 @@
 import streamlit as st
-
+from langchain_classic.memory import ConversationBufferMemory
 
 from rag_retrieval import query_data_rag
 import rag_indexing_pipeline
@@ -10,6 +10,14 @@ st.title("Tech Expert")
 # Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "memory" not in st.session_state:
+    st.session_state.memory = ConversationBufferMemory(
+        memory_key="history",
+        return_messages=False,  # since you're using a string PromptTemplate
+    )
+
+memory = st.session_state.memory
 
 # Display chat messages from history on app rerun
 for message in st.session_state.messages:
@@ -26,7 +34,7 @@ if prompt := st.chat_input("What is up?"):
     # response = f"Echo: {prompt}"
     # Display assistant response in chat message container
     with st.chat_message("assistant"):
-        response = st.write_stream(query_data_rag(prompt,rag_indexing_pipeline.client))
+        response = st.write_stream(query_data_rag(prompt,rag_indexing_pipeline.client,memory))
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": response})
 

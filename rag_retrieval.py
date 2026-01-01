@@ -1,36 +1,12 @@
-# from googleapiclient.discovery import build 1
-# from google_auth_oauthlib.flow import InstalledAppFlow 2
-# from google.auth.transport.requests import Request 3
 from dotenv import load_dotenv
 import os
-
-# from saving_transcript import raw_transcript
 import time
-# from langdetect import detect
-# from datetime import datetime, timezone 4
-# from langdetect import detect, DetectorFactory, LangDetectException 5
-# from supadata import errors as supadata_errors 6
-
-# from llama_index.core import Document 7
-# from llama_index.core.node_parser import (
-#     SentenceSplitter,
-#     SemanticSplitterNodeParser,
-# ) 8
-# from llama_index.embeddings.openai import OpenAIEmbedding 8
 import re
-
-
-# import chromadb 9
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings,ChatOpenAI
-
-# from langchain_classic.chains import RetrievalQA,ConversationalRetrievalChain 10 do something with this
-
-# import rag_indexing_pipeline  11
-
 from langchain_classic.prompts import PromptTemplate
 from datetime import datetime
-
+# from langchain_classic.memory import ConversationBufferMemory
 
 """
 Online RAG retrieval module.
@@ -167,6 +143,9 @@ Each chunk may start with metadata such as title, channel, and published date.
 Context:
 {context}
 
+Conversation so far:
+{history}
+
 Rules:
 - If the question is NOT about tech products, say: "I don't know."
 - If the context does not contain the answer, say: "I don't know."
@@ -207,7 +186,17 @@ Question: {question}
 
 Answer:
 """
-def query_data_rag(query, client):
+
+
+
+# memory = ConversationBufferMemory(
+#         memory_key="history",
+#         return_messages=False,  # since you're using a string PromptTemplate
+#     )
+
+
+
+def query_data_rag(query, client,memory):
 
     
 
@@ -254,29 +243,55 @@ def query_data_rag(query, client):
     context = format_docs_with_metadata(docs)
 
     # # 4) Run the LLM with our custom prompt
-    formatted_prompt = prompt.format(context=context, question=query)
-    llm_response = llm.invoke(formatted_prompt)
+    # formatted_prompt = prompt.format(context=context, question=query)
+    # llm_response = llm.invoke(formatted_prompt)
 
    
 
-    # return {
-    #     "answer": llm_response.content,
-    #     "source_documents": docs,
-    #     "time_sensitive": time_sensitive,
-    # }
+    # # return {
+    # #     "answer": llm_response.content,
+    # #     "source_documents": docs,
+    # #     "time_sensitive": time_sensitive,
+    # # }
 
-    for word in llm_response.content.split():
-        yield word + " "
-        time.sleep(0.05)
+    # for word in llm_response.content.split():
+    #     yield word + " "
+    #     time.sleep(0.05)
 
     # return llm_response.content
+
+    history = memory.load_memory_variables({}).get("history", "")
+
+    # 2) Inject history into prompt
+    formatted_prompt = prompt.format(
+        context=context,
+        question=query,
+        history=history,
+    )
+
+    llm_response = llm.invoke(formatted_prompt)
+
+    # 3) Save the new turn
+    memory.save_context(
+        {"input": query},
+        {"output": llm_response.content},
+    )
+    print(llm_response.content)
+    # stream out answer
+    # for word in llm_response.content.split():
+    #     yield word + " "
+    #     time.sleep(0.05)
     
+
+    for chunk in re.split(r"(\s+)", llm_response.content):
+        yield chunk
+        time.sleep(0.02)
 
 
 # query = "How is the battery life on the Samsung Z Fold 7?"
 # query = "what phones came out recently?"
 # # query = "whats are the states in nigeria"
-# # query_data(query,chunk_vector.client)
+# query_data(query,chunk_vector.client)
 # print(query_data_rag(query,rag_indexing_pipeline.client))
 
 
