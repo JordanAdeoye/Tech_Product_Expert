@@ -1,5 +1,8 @@
 FROM apache/airflow:3.1.5
 
+USER root
+RUN apt-get update && apt-get install -y curl && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 COPY --chown=airflow:0 requirements.txt /tmp/requirements.txt
 
 USER airflow
