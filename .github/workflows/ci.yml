@@ -54,3 +54,6 @@ jobs:
 
       - name: Build Docker image
         run: make docker-build
+
+      - name: docker airflow
+        run: make docker-build-airflow

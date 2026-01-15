@@ -1,0 +1,114 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: true
+
+jobs:
+  check-ci:
+    name: Check CI Status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CI to complete
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Docker Build'   # must exactly match the CI check name
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+
+  deploy:
+    name: Deploy to EC2 Production
+    runs-on: ubuntu-latest
+    needs: [check-ci]
+    environment: production
+
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          ssh -i ~/.ssh/deploy_key $EC2_USERNAME@$EC2_HOST bash -s << ENDSSH
+            set -euo pipefail
+
+            echo "=========================================="
+            echo "🚀 Starting Deployment to Production"
+            echo "=========================================="
+            echo "Time: \$(date)"
+            echo "Repo: ${REPO}"
+            echo "Commit: ${SHA}"
+            echo "Actor: ${ACTOR}"
+            echo ""
+
+            cd ~/Tech_Product_Expert
+
+            echo "📌 Current version:"
+            git log -1 --oneline || true
+
+            echo ""
+            echo "📊 Current container status:"
+            cd airflow-docker && docker compose ps || true
+            cd ..
+
+            echo ""
+            echo "📥 Pulling latest changes from GitHub..."
+            git fetch origin
+            git reset --hard origin/main
+
+            echo ""
+            echo "📌 New version:"
+            git log -1 --pretty=format:"Commit: %h%nAuthor: %an%nDate: %ar%nMessage: %s"
+            echo ""
+
+            cd airflow-docker
+
+            echo ""
+            echo "🛑 Stopping containers gracefully..."
+            docker compose down --timeout 30
+
+            echo ""
+            echo "🔨 Building and starting containers..."
+            docker compose up -d --build --force-recreate
+
+            echo ""
+            echo "⏳ Waiting for services to start..."
+            sleep 45
+
+            echo ""
+            echo "✅ Deployment Complete"
+            docker compose ps
+          ENDSSH
+
+      - name: Verify Deployment (via domain)
+        run: |
+          set -e
+          echo "🔍 Verifying deployment..."
+
+          sleep 15
+
+          echo "Checking NGINX/domain..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://techtalkrag.com || true)
+          echo "Domain returned HTTP $HTTP_CODE"
+
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+            echo "✅ Domain is responding"
+          else
+            echo "⚠️ Domain not healthy yet (HTTP $HTTP_CODE)"
+            exit 1
+          fi

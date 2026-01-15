@@ -37,8 +37,6 @@ OPEN_API_KEY = os.getenv('OPEN_API_KEY')
 """
 THIS SCRIPT HANDLES THE RETRIVAL PROCESS AND USES MY TIME-AWARE RETRIVAL LOGIC WITH THE PUBLISHED_AT KEY
 """
-OPEN_API_KEY = os.getenv('OPEN_API_KEY')
-
 
 # --- Helpers --------------------------------------------------------
 
