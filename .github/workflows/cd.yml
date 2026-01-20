@@ -44,7 +44,9 @@ jobs:
             echo ""
 
             cd ~/Tech_Product_Expert
-
+            
+            # Fix permissions if needed
+            sudo chown -R $(whoami):$(whoami) .
             # Safety (optional but good)
             git config --global --add safe.directory "$(pwd)"
 
