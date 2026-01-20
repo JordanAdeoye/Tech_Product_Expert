@@ -2,44 +2,12 @@
 import sys
 sys.path.insert(0, "/opt/airflow/project")
 
-# from youtube_ingestion_pipeline import store_data
-# from rag_indexing_pipeline import chunk_and_index
 
 from datetime import datetime,timedelta
 
 from airflow.sdk import DAG
 from airflow.providers.standard.operators.python import PythonOperator
 
-# # A Dag represents a workflow, a collection of tasks
-# with DAG(
-#     "Tech_Expert",
-#     # These args will get passed on to each operator
-#     # You can override them on a per-task basis during operator initialization
-#     default_args={
-#         "depends_on_past": False,
-#         "retries": 1,
-#         "retry_delay": timedelta(minutes=5),
-#     },
-#     description="keep ingesting new data into our database",
-#     schedule="*/20 * * * *",
-#     start_date=datetime(2025, 12, 25),
-#     catchup=False,
-#     tags=["tech_talk"],
-# ) as dag:
-
-#     # t1, t2 and t3 are examples of tasks created by instantiating operators
-#     t1 = PythonOperator(
-#         task_id="StoreinDatabse",
-#         python_callable=store_data,
-
-#     )
-
-#     t2 = PythonOperator(
-#         task_id="Chunk&IndexinChromadb",
-#         python_callable=chunk_and_index,
-#     )
-
-#     t1 >> t2
 
 
 
