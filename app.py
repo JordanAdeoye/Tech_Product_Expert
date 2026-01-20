@@ -23,6 +23,7 @@ client = chromadb.CloudClient(
 )
 
 
+<<<<<<< HEAD
 # st.title("Tech Expert")
 
 # # Initialize chat history
@@ -73,6 +74,8 @@ client = chromadb.CloudClient(
 
 
 
+=======
+>>>>>>> origin/demo
 
 
 # Page configuration
@@ -260,3 +263,41 @@ if prompt := st.chat_input("Ask me anything about tech gadgets..."):
 # query = "How is the battery life on the Samsung Z Fold 7?"
 # query = "whats are the states in nigeria"
 # return_response = query_data(query,chunk_vector.client)
+
+
+
+
+# st.title("Tech Expert")
+
+# # Initialize chat history
+# if "messages" not in st.session_state:
+#     st.session_state.messages = []
+
+# if "memory" not in st.session_state:
+#     st.session_state.memory = ConversationBufferMemory(
+#         memory_key="history",
+#         return_messages=False,  # since you're using a string PromptTemplate
+#     )
+
+# memory = st.session_state.memory
+
+# # Display chat messages from history on app rerun
+# for message in st.session_state.messages:
+#     with st.chat_message(message["role"]):
+#         st.markdown(message["content"])
+
+# # React to user input
+# if prompt := st.chat_input("What is up?"):
+#     # Display user message in chat message container
+#     st.chat_message("user").markdown(prompt)
+#     # Add user message to chat history
+#     st.session_state.messages.append({"role": "user", "content": prompt})
+
+#     # response = f"Echo: {prompt}"
+#     # Display assistant response in chat message container
+#     with st.chat_message("assistant"):
+#         response = st.write_stream(query_data_rag(prompt,client,memory))
+#     # Add assistant response to chat history
+#     st.session_state.messages.append({"role": "assistant", "content": response})
+
+
