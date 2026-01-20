@@ -18,10 +18,6 @@ from supabase import create_client, Client
 import logging
 logger = logging.getLogger(__name__)
 
-# url: str = os.getenv("SUPABASE_URL")
-# key: str = os.getenv("SUPABASE_KEY")
-
-# supabase: Client = create_client(url, key)
 
 DetectorFactory.seed = 0  # makes results reproducible
 
@@ -35,26 +31,13 @@ youtube_channels = ["@mkbhd","@unboxtherapy"]
 
 
 
-""" THIS IS THE MAIN PIPELINE OPF MY RAG THIS USING THE YOUTUBE API TO TO GET INFORMATION ON YOUTUBE VIDEOS 
-CREATES A JSON(FOR DATA ON EACH VIDEO) AND TEXT(TO STORE TRASCRIPT OF EACH VIDEO)
-
-IT CONTAINS THE LOGIC ON HOW TO STORES DATA AND  AVOID DUPLICATES AND ALSO ANYTIME IT RUNS IT CHECKS FOR NEW VIDEOS
-
-IT ALSO CREATES A STATE.JSON TO INFORM ADMIN ABOUT THE NEW VIDEOS ADDED ON EACH RUN OR IF THERE WAS NO NEW VIDEO TO ADD
-
-IT ALSO INFORMS ADMIN ON THE EACH FILES THAT HAS BEEN CLEANED/PROCESSED AND ADDED TO THE VECTORDB
-
-AND IT ALSO USE "SAVING_TRANSCRIPT.PY" TO USE THE API OF SUPADAT TO DOWNKOADF TRANSCRIPTS FOR VIDEOS
-"""
-
 """
 Stage 1 of the RAG data pipeline.
 
 This script:
 - Uses YouTube + Supadata to discover new videos
-- Stores raw transcripts and metadata locally
-- Maintains state.json to avoid duplicates and track new videos
-- Saves one JSON per video and one transcript text file
+- Stores raw transcripts and metadata on my supabase database
+- Avoid duplicates and track new videos
 - Writes only new videos on each run
 
 This script runs BEFORE rag_indexing_pipeline.py.
@@ -108,16 +91,7 @@ def get_youtube_channel_playlist(id,nextpage=None):
     
     return response
 
-"""after creating the folders if , say there is something inside you dont want rewrite the whole folder, do you want to use the date to check 
-if therer are any recently uploaded videos 
 
-since the files name will be date_channel_name_videoid
-
-i guess i can use the date to check if there is any new video uploaded to the youtube channel recently
-"""
-
-
-# get_youtube_channel_playlist(username_id,nextpage="EAAaHlBUOkNHUWlFRUZCUVRVMFJETTFSakJHTWpoRlFqaw")
 
 
 
@@ -136,6 +110,9 @@ def safe_detect_language(text):
 
 
 def supadata_error_handler(url, videoid):
+    """
+    download youtube video transcript using supadata and handles multiple error cases
+    """
     max_retries = 5
     delay = 5  # start with 5 seconds
 
@@ -203,7 +180,6 @@ def supadata_error_handler(url, videoid):
 def supabase()-> Client | None:
     """
     Create and return Supabase client from environment variables.
-
     Returns:
         Supabase client if credentials are available, None otherwise
     """
@@ -231,9 +207,9 @@ def upload_transcript_bytes(transcript_path: str, raw_text: str) -> str:
     """
     Upload transcript text directly to Supabase Storage (bucket: transcripts)
     using raw bytes, no local files.
-
-    transcript_path: e.g. "UCBJycsmduvYEL83R_U4JriQ/raw/yWBz2qZJ8zY.txt"
+    transcript_path: e.g. "2025-08-25_Marques_Brownlee_eCR17sBh-Qw.txt"
     """
+    
     if SUPABASE_URL is None or SUPABASE_KEY is None:
         raise RuntimeError("SUPABASE_URL or SUPABASE_KEY not set")
 
@@ -268,6 +244,9 @@ def upload_transcript_bytes(transcript_path: str, raw_text: str) -> str:
 
 
 def store_data():
+    """
+    handles storing the data(channels info, video info and logging) on supabase database , handle duplicates
+    """
     sb = supabase()
     video_rows = []
     logs = []
@@ -344,9 +323,9 @@ def store_data():
                 
 
                 now_utc = datetime.now(timezone.utc) # time transcript was fetched 
-                # handle = handle.lstrip("@")
+                
                 transcript_path = f"{handle}/{txt_filename}" # store bucket path to text file
-                # transcript_path = f"{username_id}/raw/{video_id}.txt"
+               
 
                 if raw_text: # if raw_text(transcript) is all good
                     try:
@@ -430,9 +409,9 @@ def store_data():
         state_now_utc = datetime.now(timezone.utc)
         last_checked_at = state_now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
         
-        # print(video_rows)
+        
 
-        # Channels
+        # Channels 
         res_channel = (
             sb.table("Channels")
             .upsert([{"youtube_channel_id": username_id,"handle":handle,"channel_title":title,
@@ -448,7 +427,7 @@ def store_data():
                             on_conflict="video_id",
                         default_to_null=True).execute()
 
-# logs
+# logs 
     if logs:
         sb.table("Logs").upsert(logs,
                             on_conflict="video_id",
