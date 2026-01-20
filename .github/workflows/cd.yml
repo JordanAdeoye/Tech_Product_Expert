@@ -41,9 +41,9 @@ jobs:
             echo "🚀 Starting Deployment to Production"
             echo "=========================================="
             echo "Time: $(date)"
-            echo "Repo: ${REPO}"
-            echo "Commit: ${SHA}"
-            echo "Actor: ${ACTOR}"
+            echo "Repo: $REPO"
+            echo "Commit: $SHA"
+            echo "Actor: $ACTOR"
             echo ""
 
             cd ~/Tech_Product_Expert
