@@ -9,8 +9,6 @@ from datetime import datetime
 # from langchain_classic.memory import ConversationBufferMemory
 
 """
-Online RAG retrieval module.
-
 Responsibilities:
 - Connect to the Chroma vector store via LangChain.
 - Retrieve relevant YouTube transcript chunks for a user query.
@@ -38,7 +36,7 @@ OPEN_API_KEY = os.getenv('OPEN_API_KEY')
 THIS SCRIPT HANDLES THE RETRIVAL PROCESS AND USES MY TIME-AWARE RETRIVAL LOGIC WITH THE PUBLISHED_AT KEY
 """
 
-# --- Helpers --------------------------------------------------------
+# --- Helpers ----
 
 TIME_SENSITIVE_KEYWORDS = [
     "latest",
@@ -70,6 +68,10 @@ def is_time_sensitive(query: str) -> bool:
 
 
 def parse_date_safe(date_str: str):
+    """
+    Try to parse `published_at` metadata to a datetime.
+    If parsing fails or it's missing, return None.
+    """
     if not date_str:
         return None
     try:
@@ -131,7 +133,7 @@ def format_docs_with_metadata(docs):
     return "\n\n---\n\n".join(chunks)
 
 
-# --- Main RAG function ---------------------------------------------
+# --- Main RAG function ----
 DEFAULT_TEMPLATE = """
 You are a tech product expert (phones, laptops, tablets, smartwatches, foldables, etc.).
 
@@ -187,12 +189,6 @@ Answer:
 
 
 
-# memory = ConversationBufferMemory(
-#         memory_key="history",
-#         return_messages=False,  # since you're using a string PromptTemplate
-#     )
-
-
 
 def query_data_rag(query, client,memory):
 
@@ -240,23 +236,6 @@ def query_data_rag(query, client,memory):
     # # 3) Build context string with metadata injected
     context = format_docs_with_metadata(docs)
 
-    # # 4) Run the LLM with our custom prompt
-    # formatted_prompt = prompt.format(context=context, question=query)
-    # llm_response = llm.invoke(formatted_prompt)
-
-   
-
-    # # return {
-    # #     "answer": llm_response.content,
-    # #     "source_documents": docs,
-    # #     "time_sensitive": time_sensitive,
-    # # }
-
-    # for word in llm_response.content.split():
-    #     yield word + " "
-    #     time.sleep(0.05)
-
-    # return llm_response.content
 
     history = memory.load_memory_variables({}).get("history", "")
 
@@ -275,10 +254,6 @@ def query_data_rag(query, client,memory):
         {"output": llm_response.content},
     )
     print(llm_response.content)
-    # stream out answer
-    # for word in llm_response.content.split():
-    #     yield word + " "
-    #     time.sleep(0.05)
     
 
     for chunk in re.split(r"(\s+)", llm_response.content):
@@ -286,11 +261,6 @@ def query_data_rag(query, client,memory):
         time.sleep(0.02)
 
 
-# query = "How is the battery life on the Samsung Z Fold 7?"
-# query = "what phones came out recently?"
-# # query = "whats are the states in nigeria"
-# query_data(query,chunk_vector.client)
-# print(query_data_rag(query,rag_indexing_pipeline.client))
 
 
 
