@@ -24,13 +24,6 @@ key: str = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
 
-
-"""
-THIS SCRIPT DOES THE CLEANING AND CHUNKING AND INDEXING(STORES CHUNKS IN A VECTOR DATABASE)
-
-IT ALSO KEEPS TRACK OF INDEXED FILE SO YOU DONT INDEX FILE THAT HAVE ALREADY BEEN STORED IN A VECTORDB EACH RUN
-"""
-
 """
 Stage 2 of the RAG data pipeline.
 
@@ -42,7 +35,7 @@ This script:
 - Inserts chunks into the Chroma vector database
 - Maintains indexing state to avoid reprocessing previously indexed videos
 
-This script runs AFTER youtube_fetch_pipeline.py.
+This script runs AFTER youtube_ingestion_pipeline.py.
 """
 
 
@@ -80,13 +73,13 @@ def clean_transcript(text: str) -> str:
 base_splitter = SentenceSplitter(chunk_size=2000)  # you can tune size
 
 def chunk_up(text: str):
-    # 1. First chunk the big transcript
+    # First chunk the big transcript
     base_chunks = base_splitter.split_text(text)
 
-    # 2. Convert to documents so semantic splitter sees smaller pieces
+    # Convert to documents so semantic splitter sees smaller pieces
     docs = [Document(text=c) for c in base_chunks]
 
-    # 3. Now apply semantic splitter safely
+    # Now apply semantic splitter safely
     nodes = splitter.get_nodes_from_documents(docs)
     return nodes
 
