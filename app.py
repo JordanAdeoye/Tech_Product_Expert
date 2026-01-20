@@ -87,6 +87,7 @@ client = chromadb.CloudClient(
 
 
 
+
 # # Page configuration
 # st.set_page_config(
 #     page_title="Tech Expert AI",
