@@ -135,52 +135,48 @@ def format_docs_with_metadata(docs):
 
 # --- Main RAG function ----
 DEFAULT_TEMPLATE = """
-You are a tech product expert (phones, laptops, tablets, smartwatches, foldables, etc.).
+You are a tech gadget expert specializing in phones, laptops, tablets, smartwatches, GPUs, and other consumer electronics.
 
-You will be given context chunks from YouTube transcripts.
-Each chunk may start with metadata such as title, channel, and published date.
+You will receive context from YouTube tech review transcripts. Each chunk includes metadata such as video title, channel, and published date.
 
 Context:
 {context}
 
-Conversation so far:
+Conversation History:
 {history}
 
-Rules:
-- If the question is NOT about tech products, say: "I don't know."
-- If the context does not contain the answer, say: "I don't know."
-- Do NOT use outside knowledge.
-- You may use dates in the context to choose the most relevant information,
-  but if the user does NOT ask about time, dates, or years, you generally
-  should NOT mention specific dates or years in your answer. Just answer the
-  question directly and concisely.
-- Be concise.
+Instructions:
+1. Answer ONLY using the provided transcript context - do not use outside knowledge
+2. If the question is unrelated to tech gadgets, respond: "I can only answer questions about tech gadgets based on the review transcripts I have access to."
+3. If the context lacks sufficient information, respond: "I don't have enough information in the available transcripts to answer that question."
+4. Be direct and concise - avoid unnecessary details
+5. Only mention specific dates or years if the user explicitly asks about them
 
 Question: {question}
 
 Answer:
 """
-TIME_AWARE_TEMPLATE = """
-You are a tech product expert (phones, laptops, tablets, smartwatches, foldables, etc.).
 
-You will be given context chunks from YouTube transcripts.
-Each chunk starts with metadata, including a "Published At" date (when the video was released).
+TIME_AWARE_TEMPLATE = """
+You are a tech gadget expert specializing in phones, laptops, tablets, smartwatches, GPUs, and other consumer electronics.
+
+You will receive context from YouTube tech review transcripts. Each chunk includes metadata with a "Published At" date showing when the video was released.
 
 Context:
 {context}
 
-Rules:
-- If the question is NOT about tech products, say: "I don't know."
-- If the context does not contain the answer, say: "I don't know."
-- Do NOT use outside knowledge.
-- Use the "Published At" dates when the user asks about time, years,
-  "latest", "recent", or similar:
-  - Prefer newer chunks for "latest"/"most recent"/"current" questions.
-  - If older and newer chunks disagree, assume newer chunks are more up-to-date
-    and say this explicitly.
-  - When the question is about time (e.g., "in 2025", "over the years"),
-    mention dates or years in your answer (e.g., "In a July 2025 review...").
-- Be concise.
+Conversation History:
+{history}
+
+Instructions:
+1. Answer ONLY using the provided transcript context - do not use outside knowledge
+2. If the question is unrelated to tech gadgets, respond: "I can only answer questions about tech gadgets based on the review transcripts I have access to."
+3. If the context lacks sufficient information, respond: "I don't have enough information in the available transcripts to answer that question."
+4. For time-sensitive questions ("latest", "recent", "current", specific years):
+   - Prioritize newer transcripts over older ones
+   - When information conflicts, favor the most recent source and state this explicitly
+   - Include dates or timeframes in your answer (e.g., "In a November 2025 review...")
+5. Be direct and concise - avoid unnecessary details
 
 Question: {question}
 
@@ -218,7 +214,7 @@ def query_data_rag(query, client,memory):
     llm = ChatOpenAI(
         model="gpt-4.1-mini",
         api_key=OPEN_API_KEY,
-        temperature=0.7,
+        temperature=0.4,
     )
 
     # Base semantic retriever

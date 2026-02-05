@@ -6,7 +6,7 @@
 import streamlit as st
 from langchain_classic.memory import ConversationBufferMemory
 from rag_retrieval import query_data_rag
-import rag_indexing_pipeline
+# import rag_indexing_pipeline
 import chromadb
 import os
 from dotenv import load_dotenv
@@ -26,8 +26,10 @@ client = chromadb.CloudClient(
 
 
 # Page configuration
+# Page configuration
+# Page configuration
 st.set_page_config(
-    page_title="TechTalk",
+    page_title="Tech Expert AI",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -83,7 +85,7 @@ st.markdown("""
     
     /* Button styling */
     .stButton button {
-        background: linear-gradient(135deg, #1e3a8a 0%, #FFA500 100%);
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
         color: white;
         border: none;
         border-radius: 8px;
@@ -124,8 +126,8 @@ st.markdown("""
 # Header
 st.markdown("""
     <div class="main-header">
-        <h1>🤖 TechTalk </h1>
-        <p>Your Personal Tech gadget Advisor</p>
+        <h1>🤖 TechTalk</h1>
+        <p>Your AI advisor for consumer electronics</p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -145,20 +147,29 @@ with st.sidebar:
     st.markdown("---")
     
     # Information
-    st.markdown("### ℹ️ About")
+    st.markdown("### About")
     st.markdown("""
-    This AI assistant uses RAG (Retrieval-Augmented Generation) to provide 
-    accurate, context-aware responses to your technical questions.
+    TechTalk is your AI-powered advisor for consumer electronics, providing answers based on real YouTube tech reviews.
+    
+    **How it works:**
+    - Analyzes transcripts from unbiased tech reviewers (MKBHD, Mrwhosetheboss, JerryRigEverything, LinusTechTips, and more)
+    - Provides answers based on actual expert reviews, not generic info
+    
+    **What you can ask:**
+    - Product comparisons and recommendations
+    - Specs, features, and performance details
+    - Battery life, durability, and real-world usage
+    - Latest releases and updates
     """)
     
     st.markdown("---")
-    st.markdown("**Tips for better responses:**")
+    st.markdown("### 👨‍💻 Developer")
     st.markdown("""
-    - Be specific with your questions
-    - Provide context when needed
-    - Ask follow-up questions
-    - Reference previous topics
+    Built by Jordan Adeoye
+    
+    [View My Portfolio →](http://jordanadeoye.github.io/portfolio/)
     """)
+    
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -180,8 +191,8 @@ with chat_container:
     if len(st.session_state.messages) == 0:
         st.markdown("""
             <div style="text-align: center; padding: 3rem 1rem; color: #666;">
-                <h3>👋 Welcome! How can I help you today?</h3>
-                <p>Ask me anything about laptops, phones, GPUs, and other tech gadgets.</p>
+                <h3>Welcome! How can I help you today?</h3>
+                <p>Ask me about phones, laptops, tablets, smartwatches, and other consumer electronics.</p>
             </div>
         """, unsafe_allow_html=True)
     
@@ -191,7 +202,7 @@ with chat_container:
             st.markdown(message["content"])
 
 # Chat input at the bottom
-if prompt := st.chat_input("Ask me anything about tech gadgets..."):
+if prompt := st.chat_input("Ask me about phones, laptops, and other electronics..."):
     # Display user message
     with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
@@ -202,10 +213,13 @@ if prompt := st.chat_input("Ask me anything about tech gadgets..."):
     # Display assistant response
     with st.chat_message("assistant", avatar="🤖"):
         with st.spinner("Thinking..."):
-            response = st.write_stream(query_data_rag(prompt, rag_indexing_pipeline.client, memory))
+            response = st.write_stream(query_data_rag(prompt, client, memory))
     
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": response})
+
+
+
 
 # query = "How is the battery life on the Samsung Z Fold 7?"
 # query = "whats are the states in nigeria"

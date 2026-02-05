@@ -23,11 +23,11 @@ def run_chunk_and_index():
 with DAG(
     dag_id="Tech_Expert",
     description="keep ingesting new data into our database",
-    schedule="*/20 * * * *",
-    start_date=datetime(2025, 12, 25),
+    schedule="0 9 * * 1",
+    start_date=datetime(2026, 1, 20),
     catchup=False,
     default_args={
-        "retries": 1,
+        "retries": 3,
         "retry_delay": timedelta(minutes=5),
     },
 ) as dag:

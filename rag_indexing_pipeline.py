@@ -182,17 +182,17 @@ def chunk_and_index():
             print("Indexing failed for:", transcript_path)
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    OPEN_API_KEY = os.getenv('OPEN_API_KEY')
-    embed_model = OpenAIEmbedding(
-        model="text-embedding-3-small",
-        api_key=OPEN_API_KEY)
+OPEN_API_KEY = os.getenv('OPEN_API_KEY')
+embed_model = OpenAIEmbedding(
+    model="text-embedding-3-small",
+    api_key=OPEN_API_KEY)
 
-    splitter = SemanticSplitterNodeParser(
-        buffer_size=1, breakpoint_percentile_threshold=95, embed_model=embed_model
-    )
+splitter = SemanticSplitterNodeParser(
+    buffer_size=1, breakpoint_percentile_threshold=95, embed_model=embed_model
+)
 
-    chunk_and_index()
+chunk_and_index()
 
 

@@ -22,12 +22,12 @@ logger = logging.getLogger(__name__)
 DetectorFactory.seed = 0  # makes results reproducible
 
 
-# youtube channels usersnames
-# youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia","@Mrwhosetheboss",
-#                     "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
-#                     "@ScatterVolt","@paulshardware"]
+# youtube channels usernames
+youtube_channels = ["@mkbhd","@unboxtherapy","@CarterNolanMedia","@Mrwhosetheboss",
+                    "@JerryRigEverything","@austinevans","@CreatedbyEllaYT","@ShortCircuit",
+                    "@ScatterVolt","@paulshardware"]
 
-youtube_channels = ["@mkbhd","@unboxtherapy"]
+# youtube_channels = ["@mkbhd","@unboxtherapy"]
 
 
 
@@ -82,7 +82,7 @@ def get_youtube_channel_playlist(id,nextpage=None):
     
     request = youtube.playlistItems().list(
         part="contentDetails,id,snippet,status",
-        maxResults=10,
+        maxResults=200, #200
         pageToken = nextpage,
         playlistId="UULF"+id[2:] # allows api to returns all videos except shorts
     )
