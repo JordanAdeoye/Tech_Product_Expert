@@ -1,14 +1,6 @@
 import streamlit as st
 from langchain_classic.memory import ConversationBufferMemory
 from rag_retrieval import query_data_rag
-<<<<<<< HEAD
-# import rag_indexing_pipeline
-=======
-<<<<<<< Updated upstream
-import rag_indexing_pipeline
-=======
->>>>>>> Stashed changes
->>>>>>> 79d14a8 (fixes)
 import chromadb
 import os
 from dotenv import load_dotenv
